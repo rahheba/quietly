@@ -32,27 +32,19 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _login() async {
-    // if (_formKey.currentState!.validate()) {
+    if (_formKey.currentState!.validate()) {
     setState(() {
       _isLoading = true;
     });
 
-    // Simulate login process
-    await Future.delayed(Duration(seconds: 2));
+    
 
     setState(() {
       _isLoading = false;
     });
 
-    // Navigate to Enrollment Screen
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => BottomNav()),
-        (route) => false,
-      );
+    
     }
-    // }
   }
 
   @override
