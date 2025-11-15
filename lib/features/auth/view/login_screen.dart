@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:quietly/features/auth/view/sign_up_screen.dart';
-import 'package:quietly/features/enrollment/enroll.dart';
-
+import 'package:quietly/features/teacher/bottomnav/teacher_bottom_nav_screen.dart';
+import 'package:quietly/utils/methods/custom_snackbar.dart';
 import '../../bottom_nav/bottom_nav.dart';
 
 class LoginPage extends StatefulWidget {
@@ -11,7 +13,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
@@ -26,24 +28,120 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   void _login() async {
     if (_formKey.currentState!.validate()) {
-    setState(() {
-      _isLoading = true;
-    });
+      setState(() {
+        _isLoading = true;
+      });
 
-    
+      try {
+        // Sign in with Firebase Auth
+        UserCredential userCredential = await FirebaseAuth.instance
+            .signInWithEmailAndPassword(
+              email: _emailController.text.trim(),
+              password: _passwordController.text,
+            );
 
-    setState(() {
-      _isLoading = false;
-    });
+        // Get user role from Firestore
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('Users')
+            .doc(userCredential.user?.uid)
+            .get();
 
-    
+        if (userDoc.exists) {
+          String role = userDoc.get('role') ?? 'student';
+
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+
+            // Show success message
+            showCustomSnackBar(
+              context: context,
+              message: 'Login successful!',
+              status: SnackStatus.success,
+            );
+
+            // Navigate based on role
+            if (role == 'teacher') {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => TeacherBottomNav()),
+              );
+            } else {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => BottomNav()),
+              );
+            }
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+            showCustomSnackBar(
+              context: context,
+              message: 'User data not found',
+              status: SnackStatus.error,
+            );
+          }
+        }
+      } on FirebaseAuthException catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          String errorMessage = 'Login failed';
+
+          switch (e.code) {
+            case 'user-not-found':
+              errorMessage = 'No user found with this email';
+              break;
+            case 'wrong-password':
+              errorMessage = 'Wrong password';
+              break;
+            case 'invalid-email':
+              errorMessage = 'Invalid email address';
+              break;
+            case 'user-disabled':
+              errorMessage = 'This account has been disabled';
+              break;
+            case 'too-many-requests':
+              errorMessage = 'Too many attempts. Please try again later';
+              break;
+            case 'invalid-credential':
+              errorMessage = 'Invalid email or password';
+              break;
+            default:
+              errorMessage = 'Login failed: ${e.message}';
+          }
+
+          showCustomSnackBar(
+            context: context,
+            message: errorMessage,
+            status: SnackStatus.error,
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          showCustomSnackBar(
+            context: context,
+            message: 'An error occurred. Please try again',
+            status: SnackStatus.error,
+          );
+        }
+      }
     }
   }
 
@@ -107,20 +205,21 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   children: [
                     TextFormField(
-                      controller: _usernameController,
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
                         color: textPrimary,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'Username',
+                        labelText: 'Email',
                         labelStyle: TextStyle(
                           color: textSecondary,
                           fontWeight: FontWeight.w500,
                         ),
                         prefixIcon: Icon(
-                          Icons.person_outline,
+                          Icons.email_outlined,
                           color: primaryColor,
                         ),
                         border: OutlineInputBorder(
@@ -154,7 +253,12 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter your username';
+                          return 'Please enter your email';
+                        }
+                        if (!RegExp(
+                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                        ).hasMatch(value)) {
+                          return 'Please enter a valid email';
                         }
                         return null;
                       },
@@ -234,7 +338,9 @@ class _LoginPageState extends State<LoginPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          // TODO: Implement forgot password
+                        },
                         style: TextButton.styleFrom(
                           padding: EdgeInsets.symmetric(
                             horizontal: 8,

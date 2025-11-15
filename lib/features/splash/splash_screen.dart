@@ -1,5 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:quietly/features/auth/view/login_screen.dart';
+import 'package:quietly/features/bottom_nav/bottom_nav.dart';
+import 'package:quietly/features/teacher/bottomnav/teacher_bottom_nav_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -11,17 +15,68 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
-    _navigatetohome();
+    _checkAuthAndNavigate();
   }
 
-  _navigatetohome() async {
-    await Future.delayed(Duration(seconds: 5), () {});
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => LoginPage()),
-    );
+  _checkAuthAndNavigate() async {
+    // Wait for splash screen display duration
+    await Future.delayed(Duration(seconds: 3));
+
+    // Check if user is already logged in
+    User? currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser != null) {
+      // User is logged in, check their role
+      try {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('Users')
+            .doc(currentUser.uid)
+            .get();
+
+        if (userDoc.exists && mounted) {
+          String role = userDoc.get('role') ?? 'student';
+
+          // Navigate based on role
+          if (role == 'teacher') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => TeacherBottomNav()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => BottomNav()),
+            );
+          }
+        } else {
+          // User document doesn't exist, logout and go to login
+          await FirebaseAuth.instance.signOut();
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => LoginPage()),
+            );
+          }
+        }
+      } catch (e) {
+        // Error fetching user data, go to login
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => LoginPage()),
+          );
+        }
+      }
+    } else {
+      // User is not logged in, go to login page
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => LoginPage()),
+        );
+      }
+    }
   }
 
   @override

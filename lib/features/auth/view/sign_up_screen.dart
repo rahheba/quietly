@@ -27,6 +27,7 @@ class _SignupPageState extends State<SignupPage> {
   final Color textPrimary = Color(0xFF2C1810); // Very Dark Brown
   final Color textSecondary = Color(0xFF6B4423); // Dark Brown
   bool _isStudent = true;
+
   @override
   void dispose() {
     _usernameController.dispose();
@@ -37,78 +38,104 @@ class _SignupPageState extends State<SignupPage> {
   }
 
   void _signup() async {
-    if (_formKey.currentState!.validate() && _agreeToTerms) {
-      setState(() {
-        _isLoading = true;
-      });
-      FirebaseAuth.instance
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (!_agreeToTerms) {
+      showCustomSnackBar(
+        context: context,
+        message: 'Please agree to terms and conditions',
+        status: SnackStatus.error,
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Create user with Firebase Auth
+      UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
-            email: _emailController.text,
+            email: _emailController.text.trim(),
             password: _passwordController.text,
-          )
-          .then((value) {
-            FirebaseFirestore.instance
-                .collection('Users')
-                .doc(value.user?.uid)
-                .set({
-                  'uid': value.user?.uid,
-                  'name': _usernameController.text,
-                  'email': _emailController.text,
-                  'password': _passwordController.text,
-                  'role': _isStudent == true ? 'student' : 'teacher',
-                })
-                .then((value) {
-                  showCustomSnackBar(
-                    context: context,
-                    message: 'Your Account is created successfully',
-                    status: SnackStatus.success,
-                  );
-                  Navigator.pop(context);
-                });
-          })
-          .onError((error, stackTrace) {
-            if (mounted) {
-              showCustomSnackBar(
-                context: context,
-                message: "Failed Registration",
-                status: SnackStatus.error,
-              );
-            }
+          );
+
+      // Save user data to Firestore (WITHOUT PASSWORD - security risk!)
+      await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(userCredential.user?.uid)
+          .set({
+            'uid': userCredential.user?.uid,
+            'name': _usernameController.text.trim(),
+            'email': _emailController.text.trim(),
+            'role': _isStudent ? 'student' : 'teacher',
+            'createdAt': FieldValue.serverTimestamp(),
           });
 
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Account created successfully!',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-          ),
-          backgroundColor: Color(0xFF10B981),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+        // Show success message
+        showCustomSnackBar(
+          context: context,
+          message: 'Account created successfully!',
+          status: SnackStatus.success,
+        );
 
-      Navigator.pop(context);
-    } else if (!_agreeToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Please agree to terms and conditions',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-          ),
-          backgroundColor: Color(0xFFEF4444),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+        // Navigate back to login
+        Navigator.pop(context);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        String errorMessage = 'Registration failed';
+
+        switch (e.code) {
+          case 'email-already-in-use':
+            errorMessage = 'This email is already registered. Please login.';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Invalid email address';
+            break;
+          case 'operation-not-allowed':
+            errorMessage = 'Email/password accounts are not enabled';
+            break;
+          case 'weak-password':
+            errorMessage = 'Password is too weak. Use at least 8 characters';
+            break;
+          case 'network-request-failed':
+            errorMessage = 'Network error. Please check your connection';
+            break;
+          default:
+            errorMessage = 'Registration failed: ${e.message}';
+        }
+
+        showCustomSnackBar(
+          context: context,
+          message: errorMessage,
+          status: SnackStatus.error,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        showCustomSnackBar(
+          context: context,
+          message: 'An unexpected error occurred. Please try again',
+          status: SnackStatus.error,
+        );
+      }
     }
   }
 
@@ -196,7 +223,7 @@ class _SignupPageState extends State<SignupPage> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFFEF4444), width: 1),
+                        border: Border.all(color: primaryColor, width: 1.5),
                       ),
                       child: Column(
                         children: [

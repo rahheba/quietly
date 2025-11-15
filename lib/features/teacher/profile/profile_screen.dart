@@ -1,6 +1,8 @@
 // File: lib/features/teacher/teacher_profile.dart
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:quietly/features/auth/view/login_screen.dart';
 
 // Mock class to simulate shared class data (in real app, this would be from Firebase/Firestore)
 class ClassManager {
@@ -953,7 +955,13 @@ class TeacherProfile extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
+              // Navigator.pop(context);
+              FirebaseAuth.instance.signOut();
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => LoginPage()),
+                (route) => false,
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
