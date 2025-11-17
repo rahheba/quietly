@@ -1,208 +1,1717 @@
-// File: lib/features/teacher/teacher_profile.dart
+// import 'dart:convert';
+// import 'dart:io';
 
+// import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:flutter/material.dart';
+// import 'package:image_picker/image_picker.dart';
+// import 'package:quietly/features/auth/view/login_screen.dart';
+// import 'package:quietly/features/profile/add_student_inclass.dart';
+// import 'package:quietly/utils/methods/custom_snackbar.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
+
+// class TeacherProfile extends StatefulWidget {
+//   @override
+//   _TeacherProfileState createState() => _TeacherProfileState();
+// }
+
+// class _TeacherProfileState extends State<TeacherProfile> {
+//   final FirebaseAuth _auth = FirebaseAuth.instance;
+//   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+//   File? _profileImage;
+//   String? _savedImage;
+
+//   // User data
+//   Map<String, dynamic>? userData;
+//   bool isLoading = true;
+//   List<Map<String, dynamic>> userClasses = [];
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _loadUserData();
+//     _loadSavedProfileImage();
+//   }
+
+//   // Load user data from Firebase
+//   Future<void> _loadUserData() async {
+//     try {
+//       final user = _auth.currentUser;
+//       if (user == null) return;
+
+//       // Get user document
+//       final userDoc = await _firestore.collection('Users').doc(user.uid).get();
+
+//       if (userDoc.exists) {
+//         setState(() {
+//           userData = userDoc.data();
+//         });
+
+//         // Load classes if teacher
+//         if (userData?['role'] == 'teacher') {
+//           await _loadTeacherClasses();
+//         }
+//       }
+//     } catch (e) {
+//       print('Error loading user data: $e');
+//       if (mounted) {
+//         showCustomSnackBar(
+//           context: context,
+//           message: 'Failed to load profile data',
+//           status: SnackStatus.error,
+//         );
+//       }
+//     } finally {
+//       if (mounted) {
+//         setState(() {
+//           isLoading = false;
+//         });
+//       }
+//     }
+//   }
+
+//   // Load teacher's classes from Firebase
+//   Future<void> _loadTeacherClasses() async {
+//     try {
+//       final user = _auth.currentUser;
+//       if (user == null) return;
+
+//       final classesSnapshot = await _firestore
+//           .collection('Classes')
+//           .where('teacherId', isEqualTo: user.uid)
+//           .get();
+
+//       setState(() {
+//         userClasses = classesSnapshot.docs
+//             .map((doc) => {'id': doc.id, ...doc.data()})
+//             .toList();
+//       });
+//     } catch (e) {
+//       print('Error loading classes: $e');
+//     }
+//   }
+
+//   Future<void> _pickImage() async {
+//     final picker = ImagePicker();
+//     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+//     if (pickedFile != null) {
+//       File imageFile = File(pickedFile.path);
+
+//       // convert image to base64
+//       List<int> imageBytes = await imageFile.readAsBytes();
+//       String base64Image = base64Encode(imageBytes);
+
+//       final prefs = await SharedPreferences.getInstance();
+//       await prefs.setString('teacher_profile_image', base64Image);
+
+//       setState(() {
+//         _profileImage = imageFile;
+//       });
+//     }
+//   }
+
+//   Future<void> _loadSavedProfileImage() async {
+//     final prefs = await SharedPreferences.getInstance();
+//     final imageString = prefs.getString('teacher_profile_imagep');
+
+//     if (imageString != null) {
+//       final bytes = base64Decode(imageString);
+//       final tempDir = Directory.systemTemp;
+//       final tempFile = await File('${tempDir.path}/profile.png').create();
+//       await tempFile.writeAsBytes(bytes);
+
+//       setState(() {
+//         _profileImage = tempFile;
+//       });
+//     }
+//   }
+
+//   // Update user profile
+//   Future<void> _updateProfile(Map<String, dynamic> updates) async {
+//     try {
+//       final user = _auth.currentUser;
+//       if (user == null) return;
+
+//       await _firestore.collection('Users').doc(user.uid).update(updates);
+
+//       setState(() {
+//         userData = {...?userData, ...updates};
+//       });
+
+//       if (mounted) {
+//         showCustomSnackBar(
+//           context: context,
+//           message: 'Profile updated successfully',
+//           status: SnackStatus.success,
+//         );
+//       }
+//     } catch (e) {
+//       print('Error updating profile: $e');
+//       if (mounted) {
+//         showCustomSnackBar(
+//           context: context,
+//           message: 'Failed to update profile',
+//           status: SnackStatus.error,
+//         );
+//       }
+//     }
+//   }
+
+//   // Create new class
+//   Future<void> _createClass(Map<String, dynamic> classData) async {
+//     try {
+//       final user = _auth.currentUser;
+//       if (user == null) return;
+
+//       await _firestore.collection('Classes').add({
+//         ...classData,
+//         'teacherId': user.uid,
+//         'teacherName': userData?['name'] ?? '',
+//         'createdAt': FieldValue.serverTimestamp(),
+//       });
+
+//       await _loadTeacherClasses();
+
+//       if (mounted) {
+//         showCustomSnackBar(
+//           context: context,
+//           message: 'Class created successfully',
+//           status: SnackStatus.success,
+//         );
+//       }
+//     } catch (e) {
+//       print('Error creating class: $e');
+//       if (mounted) {
+//         showCustomSnackBar(
+//           context: context,
+//           message: 'Failed to create class',
+//           status: SnackStatus.error,
+//         );
+//       }
+//     }
+//   }
+
+//   // Update class
+//   Future<void> _updateClass(
+//     String classId,
+//     Map<String, dynamic> updates,
+//   ) async {
+//     try {
+//       await _firestore.collection('Classes').doc(classId).update(updates);
+//       await _loadTeacherClasses();
+
+//       if (mounted) {
+//         showCustomSnackBar(
+//           context: context,
+//           message: 'Class updated successfully',
+//           status: SnackStatus.success,
+//         );
+//       }
+//     } catch (e) {
+//       print('Error updating class: $e');
+//       if (mounted) {
+//         showCustomSnackBar(
+//           context: context,
+//           message: 'Failed to update class',
+//           status: SnackStatus.error,
+//         );
+//       }
+//     }
+//   }
+
+//   // Delete class
+//   Future<void> _deleteClass(String classId) async {
+//     try {
+//       await _firestore.collection('Classes').doc(classId).delete();
+//       await _loadTeacherClasses();
+
+//       if (mounted) {
+//         showCustomSnackBar(
+//           context: context,
+//           message: 'Class deleted successfully',
+//           status: SnackStatus.success,
+//         );
+//       }
+//     } catch (e) {
+//       print('Error deleting class: $e');
+//       if (mounted) {
+//         showCustomSnackBar(
+//           context: context,
+//           message: 'Failed to delete class',
+//           status: SnackStatus.error,
+//         );
+//       }
+//     }
+//   }
+
+//   // Send notification to class
+//   Future<void> _sendNotification(
+//     String classId,
+//     String title,
+//     String message,
+//   ) async {
+//     try {
+//       await _firestore.collection('Notifications').add({
+//         'classId': classId,
+//         'title': title,
+//         'message': message,
+//         'senderId': _auth.currentUser?.uid,
+//         'senderName': userData?['name'] ?? '',
+//         'timestamp': FieldValue.serverTimestamp(),
+//         'read': false,
+//       });
+
+//       if (mounted) {
+//         showCustomSnackBar(
+//           context: context,
+//           message: 'Notification sent successfully',
+//           status: SnackStatus.success,
+//         );
+//       }
+//     } catch (e) {
+//       print('Error sending notification: $e');
+//       if (mounted) {
+//         showCustomSnackBar(
+//           context: context,
+//           message: 'Failed to send notification',
+//           status: SnackStatus.error,
+//         );
+//       }
+//     }
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     if (isLoading) {
+//       return Scaffold(
+//         appBar: AppBar(
+//           title: Text('Profile'),
+//           backgroundColor: Colors.purple,
+//           foregroundColor: Colors.white,
+//         ),
+//         body: Center(child: CircularProgressIndicator()),
+//       );
+//     }
+
+//     final isTeacher = userData?['role'] == 'teacher';
+
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: Text('Profile'),
+//         backgroundColor: Colors.purple,
+//         foregroundColor: Colors.white,
+//         actions: [
+//           IconButton(icon: Icon(Icons.refresh), onPressed: _loadUserData),
+//         ],
+//       ),
+//       body: RefreshIndicator(
+//         onRefresh: _loadUserData,
+//         child: SingleChildScrollView(
+//           physics: AlwaysScrollableScrollPhysics(),
+//           child: Column(
+//             children: [
+//               SizedBox(height: 32),
+
+//               // Profile Picture
+//               // CircleAvatar(
+//               //   radius: 60,
+//               //   backgroundColor: Colors.purple,
+//               //   child: Text(
+//               //     (userData?['name'] ?? 'U')[0].toUpperCase(),
+//               //     style: TextStyle(fontSize: 40, color: Colors.white),
+//               //   ),
+//               // ),
+//               Center(
+//                 child: Stack(
+//                   children: [
+//                     Container(
+//                       decoration: BoxDecoration(
+//                         shape: BoxShape.circle,
+//                         boxShadow: [
+//                           BoxShadow(
+//                             color: Colors.white.withOpacity(0.3),
+//                             blurRadius: 20,
+//                             offset: Offset(0, 10),
+//                           ),
+//                         ],
+//                       ),
+//                       child: CircleAvatar(
+//                         radius: 60,
+//                         backgroundColor: Colors.purple,
+//                         backgroundImage: _profileImage != null
+//                             ? FileImage(_profileImage!)
+//                             : null,
+//                         child: _profileImage == null
+//                             ? Text(
+//                                 userData?['name']?.isNotEmpty == true
+//                                     ? userData!['name'][0].toUpperCase()
+//                                     : 'U',
+//                                 style: TextStyle(
+//                                   fontSize: 48,
+//                                   fontWeight: FontWeight.bold,
+//                                   color: Colors.white,
+//                                 ),
+//                               )
+//                             : null,
+//                       ),
+//                     ),
+
+//                     // Camera Icon — Clickable
+//                     Positioned(
+//                       bottom: 0,
+//                       right: 0,
+//                       child: GestureDetector(
+//                         onTap: _pickImage,
+//                         child: Container(
+//                           padding: EdgeInsets.all(8),
+//                           decoration: BoxDecoration(
+//                             color: Colors.purple,
+//                             shape: BoxShape.circle,
+//                             border: Border.all(color: Colors.white, width: 3),
+//                           ),
+//                           child: Icon(
+//                             Icons.camera_alt,
+//                             color: Colors.white,
+//                             size: 20,
+//                           ),
+//                         ),
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//               SizedBox(height: 16),
+
+//               // User Info
+//               Text(
+//                 userData?['name'] ?? 'User',
+//                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+//               ),
+//               Text(
+//                 userData?['email'] ?? '',
+//                 style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+//               ),
+//               SizedBox(height: 8),
+//               Container(
+//                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+//                 decoration: BoxDecoration(
+//                   color: isTeacher ? Colors.purple : Colors.blue,
+//                   borderRadius: BorderRadius.circular(20),
+//                 ),
+//                 child: Text(
+//                   isTeacher ? 'Teacher' : 'Student',
+//                   style: TextStyle(
+//                     color: Colors.white,
+//                     fontWeight: FontWeight.bold,
+//                   ),
+//                 ),
+//               ),
+//               SizedBox(height: 32),
+
+//               // Profile Info Cards
+//               _buildInfoCard(
+//                 icon: Icons.person,
+//                 title: 'Username',
+//                 value: userData?['name'] ?? 'N/A',
+//               ),
+//               _buildInfoCard(
+//                 icon: Icons.email,
+//                 title: 'Email',
+//                 value: userData?['email'] ?? 'N/A',
+//               ),
+//               _buildInfoCard(
+//                 icon: Icons.badge,
+//                 title: 'Role',
+//                 value: isTeacher ? 'Teacher' : 'Student',
+//               ),
+
+//               // Teacher-specific info
+//               if (isTeacher) ...[
+//                 _buildInfoCard(
+//                   icon: Icons.class_,
+//                   title: 'My Classes',
+//                   value: '${userClasses.length} Classes',
+//                 ),
+//               ],
+
+//               SizedBox(height: 16),
+
+//               // Teacher-specific buttons
+//               if (isTeacher) ...[
+//                 _buildButton(
+//                   context,
+//                   label: 'Manage Classes',
+//                   icon: Icons.class_,
+//                   color: Colors.blue,
+//                   onPressed: () {
+//                     Navigator.push(
+//                       context,
+//                       MaterialPageRoute(
+//                         builder: (context) => CreateClassPage(),
+//                       ),
+//                     );
+//                   },
+//                 ),
+//                 SizedBox(height: 12),
+//                 _buildButton(
+//                   context,
+//                   label: 'Send Notification',
+//                   icon: Icons.notifications_active_outlined,
+//                   color: Colors.orange,
+//                   onPressed: () => _showNotificationDialog(context),
+//                 ),
+//                 SizedBox(height: 12),
+//               ],
+
+//               // Edit Profile Button
+//               _buildButton(
+//                 context,
+//                 label: 'Edit Profile',
+//                 icon: Icons.edit,
+//                 color: Colors.purple,
+//                 onPressed: () => _showEditProfileDialog(context),
+//               ),
+//               SizedBox(height: 12),
+
+//               // Logout Button
+//               Padding(
+//                 padding: EdgeInsets.symmetric(horizontal: 16),
+//                 child: SizedBox(
+//                   width: double.infinity,
+//                   height: 50,
+//                   child: OutlinedButton(
+//                     onPressed: () => _showLogoutDialog(context),
+//                     style: OutlinedButton.styleFrom(
+//                       side: BorderSide(color: Colors.red, width: 2),
+//                       foregroundColor: Colors.red,
+//                       shape: RoundedRectangleBorder(
+//                         borderRadius: BorderRadius.circular(12),
+//                       ),
+//                     ),
+//                     child: Text(
+//                       'Logout',
+//                       style: TextStyle(
+//                         fontSize: 16,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               ),
+//               SizedBox(height: 32),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildButton(
+//     BuildContext context, {
+//     required String label,
+//     IconData? icon,
+//     required Color color,
+//     required VoidCallback onPressed,
+//   }) {
+//     return Padding(
+//       padding: EdgeInsets.symmetric(horizontal: 16),
+//       child: SizedBox(
+//         width: double.infinity,
+//         height: 50,
+//         child: ElevatedButton.icon(
+//           onPressed: onPressed,
+//           icon: icon != null ? Icon(icon) : SizedBox(),
+//           label: Text(
+//             label,
+//             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+//           ),
+//           style: ElevatedButton.styleFrom(
+//             backgroundColor: color,
+//             foregroundColor: Colors.white,
+//             shape: RoundedRectangleBorder(
+//               borderRadius: BorderRadius.circular(12),
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildInfoCard({
+//     required IconData icon,
+//     required String title,
+//     required String value,
+//   }) {
+//     return Container(
+//       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+//       padding: EdgeInsets.all(16),
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(12),
+//         boxShadow: [
+//           BoxShadow(
+//             color: Colors.grey.withOpacity(0.1),
+//             spreadRadius: 1,
+//             blurRadius: 4,
+//           ),
+//         ],
+//       ),
+//       child: Row(
+//         children: [
+//           Container(
+//             padding: EdgeInsets.all(12),
+//             decoration: BoxDecoration(
+//               color: Colors.purple.shade50,
+//               borderRadius: BorderRadius.circular(10),
+//             ),
+//             child: Icon(icon, color: Colors.purple, size: 24),
+//           ),
+//           SizedBox(width: 16),
+//           Expanded(
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 Text(
+//                   title,
+//                   style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+//                 ),
+//                 SizedBox(height: 4),
+//                 Text(
+//                   value,
+//                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   // Edit Profile Dialog
+//   void _showEditProfileDialog(BuildContext context) {
+//     final _nameController = TextEditingController(text: userData?['name']);
+//     final _emailController = TextEditingController(text: userData?['email']);
+//     final _formKey = GlobalKey<FormState>();
+
+//     showDialog(
+//       context: context,
+//       builder: (context) => AlertDialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//         title: Row(
+//           children: [
+//             Icon(Icons.edit, color: Colors.purple),
+//             SizedBox(width: 12),
+//             Text('Edit Profile'),
+//           ],
+//         ),
+//         content: Form(
+//           key: _formKey,
+//           child: Column(
+//             mainAxisSize: MainAxisSize.min,
+//             children: [
+//               TextFormField(
+//                 controller: _nameController,
+//                 decoration: InputDecoration(
+//                   labelText: 'Name',
+//                   prefixIcon: Icon(Icons.person),
+//                   border: OutlineInputBorder(
+//                     borderRadius: BorderRadius.circular(12),
+//                   ),
+//                 ),
+//                 validator: (value) {
+//                   if (value == null || value.isEmpty) {
+//                     return 'Please enter your name';
+//                   }
+//                   if (value.length < 3) {
+//                     return 'Name must be at least 3 characters';
+//                   }
+//                   return null;
+//                 },
+//               ),
+//               SizedBox(height: 10),
+//               TextFormField(
+//                 controller: _emailController,
+//                 decoration: InputDecoration(
+//                   labelText: 'Email',
+//                   prefixIcon: Icon(Icons.person),
+//                   border: OutlineInputBorder(
+//                     borderRadius: BorderRadius.circular(12),
+//                   ),
+//                 ),
+//                 validator: (value) {
+//                   if (value == null || value.isEmpty) {
+//                     return 'Please enter your email';
+//                   }
+
+//                   return null;
+//                 },
+//               ),
+//             ],
+//           ),
+//         ),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Navigator.pop(context),
+//             child: Text('Cancel'),
+//           ),
+//           ElevatedButton(
+//             onPressed: () async {
+//               if (_formKey.currentState!.validate()) {
+//                 await _updateProfile({
+//                   'name': _nameController.text.trim(),
+//                   'email': _emailController.text.trim(),
+//                 });
+//                 Navigator.pop(context);
+//               }
+//             },
+//             style: ElevatedButton.styleFrom(
+//               backgroundColor: Colors.purple,
+//               foregroundColor: Colors.white,
+//             ),
+//             child: Text('Save'),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   // Manage Classes Dialog
+//   void _showManageClassesDialog(BuildContext context) {
+//     showDialog(
+//       context: context,
+//       builder: (context) => StatefulBuilder(
+//         builder: (context, setState) => AlertDialog(
+//           shape: RoundedRectangleBorder(
+//             borderRadius: BorderRadius.circular(16),
+//           ),
+//           title: Row(
+//             children: [
+//               Icon(Icons.class_, color: Colors.blue),
+//               SizedBox(width: 12),
+//               Text('Manage My Classes'),
+//             ],
+//           ),
+//           content: SizedBox(
+//             width: double.maxFinite,
+//             child: Column(
+//               mainAxisSize: MainAxisSize.min,
+//               children: [
+//                 ElevatedButton.icon(
+//                   onPressed: () {
+//                     Navigator.pop(context);
+//                     _showCreateClassDialog(context);
+//                   },
+//                   icon: Icon(Icons.add),
+//                   label: Text('Create New Class'),
+//                   style: ElevatedButton.styleFrom(
+//                     backgroundColor: Colors.blue,
+//                     foregroundColor: Colors.white,
+//                   ),
+//                 ),
+//                 SizedBox(height: 16),
+//                 Text(
+//                   'My Classes (${userClasses.length})',
+//                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+//                 ),
+//                 SizedBox(height: 8),
+//                 Container(
+//                   height: 200,
+//                   child: userClasses.isEmpty
+//                       ? Center(
+//                           child: Text(
+//                             'No classes yet',
+//                             style: TextStyle(color: Colors.grey),
+//                           ),
+//                         )
+//                       : ListView.builder(
+//                           itemCount: userClasses.length,
+//                           itemBuilder: (context, index) {
+//                             final classData = userClasses[index];
+//                             return Card(
+//                               margin: EdgeInsets.symmetric(vertical: 4),
+//                               child: ListTile(
+//                                 leading: Icon(Icons.class_, color: Colors.blue),
+//                                 title: Text(classData['className'] ?? ''),
+//                                 subtitle: Text(
+//                                   '${(classData['studentDeviceIds'] as List?)?.length ?? 0} students',
+//                                 ),
+//                                 trailing: Row(
+//                                   mainAxisSize: MainAxisSize.min,
+//                                   children: [
+//                                     IconButton(
+//                                       icon: Icon(
+//                                         Icons.edit,
+//                                         color: Colors.orange,
+//                                       ),
+//                                       onPressed: () {
+//                                         Navigator.pop(context);
+//                                         _showEditClassDialog(
+//                                           context,
+//                                           classData,
+//                                         );
+//                                       },
+//                                     ),
+//                                     IconButton(
+//                                       icon: Icon(
+//                                         Icons.delete,
+//                                         color: Colors.red,
+//                                       ),
+//                                       onPressed: () async {
+//                                         await _deleteClass(classData['id']);
+//                                         Navigator.pop(context);
+//                                       },
+//                                     ),
+//                                   ],
+//                                 ),
+//                               ),
+//                             );
+//                           },
+//                         ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//           actions: [
+//             TextButton(
+//               onPressed: () => Navigator.pop(context),
+//               child: Text('Close'),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   // Create Class Dialog
+//   void _showCreateClassDialog(BuildContext context) {
+//     final TextEditingController _classNameController = TextEditingController();
+//     final TextEditingController _subjectController = TextEditingController();
+//     final TextEditingController _deviceIdController = TextEditingController();
+
+//     List<String> students = [];
+
+//     showDialog(
+//       context: context,
+//       builder: (context) {
+//         return StatefulBuilder(
+//           builder: (context, dialogSetState) {
+//             return AlertDialog(
+//               shape: RoundedRectangleBorder(
+//                 borderRadius: BorderRadius.circular(16),
+//               ),
+//               title: Row(
+//                 children: [
+//                   Icon(Icons.add_circle, color: Colors.blue),
+//                   SizedBox(width: 12),
+//                   Text(
+//                     'Create New Class',
+//                     style: TextStyle(fontWeight: FontWeight.bold),
+//                   ),
+//                 ],
+//               ),
+
+//               // CONTENT
+//               content: SingleChildScrollView(
+//                 child: Column(
+//                   mainAxisSize: MainAxisSize.min,
+//                   children: [
+//                     /// CLASS NAME
+//                     TextField(
+//                       controller: _classNameController,
+//                       decoration: InputDecoration(
+//                         labelText: 'Class Name',
+//                         hintText: 'e.g., 9A Mathematics',
+//                         border: OutlineInputBorder(
+//                           borderRadius: BorderRadius.circular(12),
+//                         ),
+//                       ),
+//                     ),
+
+//                     SizedBox(height: 12),
+
+//                     /// SUBJECT
+//                     TextField(
+//                       controller: _subjectController,
+//                       decoration: InputDecoration(
+//                         labelText: 'Subject',
+//                         hintText: 'e.g., Mathematics, Science',
+//                         border: OutlineInputBorder(
+//                           borderRadius: BorderRadius.circular(12),
+//                         ),
+//                       ),
+//                     ),
+
+//                     SizedBox(height: 16),
+
+//                     /// STUDENT ID INPUT + ADD BUTTON
+//                     Row(
+//                       children: [
+//                         Expanded(
+//                           child: TextField(
+//                             controller: _deviceIdController,
+//                             decoration: InputDecoration(
+//                               labelText: 'Student Device ID',
+//                               border: OutlineInputBorder(
+//                                 borderRadius: BorderRadius.circular(12),
+//                               ),
+//                             ),
+//                           ),
+//                         ),
+//                         SizedBox(width: 8),
+//                         ElevatedButton(
+//                           style: ElevatedButton.styleFrom(
+//                             padding: EdgeInsets.symmetric(horizontal: 12),
+//                           ),
+//                           onPressed: () {
+//                             final id = _deviceIdController.text.trim();
+
+//                             if (id.isNotEmpty && !students.contains(id)) {
+//                               dialogSetState(() {
+//                                 students.add(id);
+//                                 _deviceIdController.clear();
+//                               });
+//                             }
+//                           },
+//                           child: Icon(Icons.add),
+//                         ),
+//                       ],
+//                     ),
+
+//                     SizedBox(height: 12),
+
+//                     /// STUDENTS LIST
+//                     Text(
+//                       'Students (${students.length})',
+//                       style: TextStyle(fontWeight: FontWeight.bold),
+//                     ),
+
+//                     SizedBox(height: 8),
+
+//                     Container(
+//                       height: 150,
+//                       decoration: BoxDecoration(
+//                         borderRadius: BorderRadius.circular(12),
+//                         border: Border.all(color: Colors.grey.shade300),
+//                       ),
+//                       child: students.isEmpty
+//                           ? Center(child: Text("No students added"))
+//                           : ListView.builder(
+//                               itemCount: students.length,
+//                               itemBuilder: (context, index) {
+//                                 return ListTile(
+//                                   leading: Icon(
+//                                     Icons.person,
+//                                     color: Colors.green,
+//                                   ),
+//                                   title: Text(students[index]),
+//                                   trailing: IconButton(
+//                                     icon: Icon(Icons.delete, color: Colors.red),
+//                                     onPressed: () {
+//                                       dialogSetState(() {
+//                                         students.removeAt(index);
+//                                       });
+//                                     },
+//                                   ),
+//                                 );
+//                               },
+//                             ),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+
+//               // ACTION BUTTONS
+//               actions: [
+//                 TextButton(
+//                   onPressed: () => Navigator.pop(context),
+//                   child: Text('Cancel'),
+//                 ),
+//                 ElevatedButton(
+//                   onPressed: () async {
+//                     final className = _classNameController.text.trim();
+//                     final subject = _subjectController.text.trim();
+
+//                     if (className.isEmpty || subject.isEmpty) return;
+
+//                     // Firestore method call
+//                     await _createClass({
+//                       'className': className,
+//                       'subject': subject,
+//                       'studentDeviceIds': students,
+//                     });
+
+//                     Navigator.pop(context);
+//                   },
+//                   child: Text('Create Class'),
+//                 ),
+//               ],
+//             );
+//           },
+//         );
+//       },
+//     );
+//   }
+
+//   // Edit Class Dialog
+//   void _showEditClassDialog(
+//     BuildContext context,
+//     Map<String, dynamic> classData,
+//   ) {
+//     final _deviceIdController = TextEditingController();
+//     List<String> students = List.from(classData['studentDeviceIds'] ?? []);
+
+//     showDialog(
+//       context: context,
+//       builder: (context) => StatefulBuilder(
+//         builder: (context, dialogSetState) => AlertDialog(
+//           shape: RoundedRectangleBorder(
+//             borderRadius: BorderRadius.circular(16),
+//           ),
+//           title: Row(
+//             children: [
+//               Icon(Icons.edit, color: Colors.orange),
+//               SizedBox(width: 12),
+//               Text('Edit ${classData['className']}'),
+//             ],
+//           ),
+//           content: SingleChildScrollView(
+//             child: Column(
+//               mainAxisSize: MainAxisSize.min,
+//               children: [
+//                 ListTile(
+//                   leading: Icon(Icons.class_, color: Colors.purple),
+//                   title: Text('Class'),
+//                   subtitle: Text(classData['className']),
+//                 ),
+//                 ListTile(
+//                   leading: Icon(Icons.subject, color: Colors.purple),
+//                   title: Text('Subject'),
+//                   subtitle: Text(classData['subject']),
+//                 ),
+//                 SizedBox(height: 16),
+//                 Row(
+//                   children: [
+//                     Expanded(
+//                       child: TextField(
+//                         controller: _deviceIdController,
+//                         decoration: InputDecoration(
+//                           labelText: 'Add Student Device ID',
+//                           border: OutlineInputBorder(
+//                             borderRadius: BorderRadius.circular(12),
+//                           ),
+//                         ),
+//                       ),
+//                     ),
+//                     SizedBox(width: 8),
+//                     ElevatedButton(
+//                       onPressed: () {
+//                         final id = _deviceIdController.text.trim();
+//                         if (id.isNotEmpty && !students.contains(id)) {
+//                           dialogSetState(() {
+//                             students.add(id);
+//                             _deviceIdController.clear();
+//                           });
+//                         }
+//                       },
+//                       child: Icon(Icons.add),
+//                     ),
+//                   ],
+//                 ),
+//                 SizedBox(height: 12),
+//                 Text('Students (${students.length})'),
+//                 Container(
+//                   height: 150,
+//                   child: ListView.builder(
+//                     itemCount: students.length,
+//                     itemBuilder: (context, index) => ListTile(
+//                       leading: Icon(Icons.person, color: Colors.green),
+//                       title: Text(students[index]),
+//                       trailing: IconButton(
+//                         icon: Icon(Icons.delete, color: Colors.red),
+//                         onPressed: () {
+//                           dialogSetState(() => students.removeAt(index));
+//                         },
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//           actions: [
+//             TextButton(
+//               onPressed: () => Navigator.pop(context),
+//               child: Text('Cancel'),
+//             ),
+//             ElevatedButton(
+//               onPressed: () async {
+//                 await _updateClass(classData['id'], {
+//                   'studentDeviceIds': students,
+//                 });
+//                 Navigator.pop(context);
+//               },
+//               child: Text('Save Changes'),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   // Send Notification Dialog
+//   void _showNotificationDialog(BuildContext context) {
+//     final _titleController = TextEditingController();
+//     final _messageController = TextEditingController();
+//     final _formKey = GlobalKey<FormState>();
+//     Map<String, dynamic>? selectedClass;
+
+//     showDialog(
+//       context: context,
+//       builder: (context) => StatefulBuilder(
+//         builder: (context, setState) => AlertDialog(
+//           shape: RoundedRectangleBorder(
+//             borderRadius: BorderRadius.circular(16),
+//           ),
+//           title: Row(
+//             children: [
+//               Icon(Icons.notifications, color: Colors.orange),
+//               SizedBox(width: 12),
+//               Text('Send Notification'),
+//             ],
+//           ),
+//           content: Form(
+//             key: _formKey,
+//             child: Column(
+//               mainAxisSize: MainAxisSize.min,
+//               children: [
+//                 DropdownButtonFormField<Map<String, dynamic>>(
+//                   decoration: InputDecoration(
+//                     labelText: 'Select Class',
+//                     prefixIcon: Icon(Icons.class_),
+//                     border: OutlineInputBorder(
+//                       borderRadius: BorderRadius.circular(12),
+//                     ),
+//                   ),
+//                   value: selectedClass,
+//                   items: userClasses.map((classData) {
+//                     return DropdownMenuItem(
+//                       value: classData,
+//                       child: Text(classData['className']),
+//                     );
+//                   }).toList(),
+//                   onChanged: (value) => setState(() => selectedClass = value),
+//                   validator: (value) =>
+//                       value == null ? 'Please select a class' : null,
+//                 ),
+//                 SizedBox(height: 16),
+//                 TextFormField(
+//                   controller: _titleController,
+//                   decoration: InputDecoration(
+//                     labelText: 'Title',
+//                     prefixIcon: Icon(Icons.title),
+//                     border: OutlineInputBorder(
+//                       borderRadius: BorderRadius.circular(12),
+//                     ),
+//                   ),
+//                   validator: (v) => v!.isEmpty ? 'Enter a title' : null,
+//                 ),
+//                 SizedBox(height: 16),
+//                 TextFormField(
+//                   controller: _messageController,
+//                   maxLines: 3,
+//                   decoration: InputDecoration(
+//                     labelText: 'Message',
+//                     prefixIcon: Icon(Icons.message),
+//                     border: OutlineInputBorder(
+//                       borderRadius: BorderRadius.circular(12),
+//                     ),
+//                   ),
+//                   validator: (v) => v!.isEmpty ? 'Enter a message' : null,
+//                 ),
+//               ],
+//             ),
+//           ),
+//           actions: [
+//             TextButton(
+//               onPressed: () => Navigator.pop(context),
+//               child: Text('Cancel'),
+//             ),
+//             ElevatedButton(
+//               onPressed: () async {
+//                 if (_formKey.currentState!.validate()) {
+//                   await _sendNotification(
+//                     selectedClass!['id'],
+//                     _titleController.text,
+//                     _messageController.text,
+//                   );
+//                   Navigator.pop(context);
+//                 }
+//               },
+//               style: ElevatedButton.styleFrom(
+//                 backgroundColor: Colors.orange,
+//                 foregroundColor: Colors.white,
+//               ),
+//               child: Text('Send'),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   // Logout Dialog
+//   void _showLogoutDialog(BuildContext context) {
+//     showDialog(
+//       context: context,
+//       builder: (context) => AlertDialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//         title: Row(
+//           children: [
+//             Icon(Icons.logout, color: Colors.red),
+//             SizedBox(width: 12),
+//             Text('Logout'),
+//           ],
+//         ),
+//         content: Text('Are you sure you want to logout?'),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Navigator.pop(context),
+//             child: Text('Cancel'),
+//           ),
+//           ElevatedButton(
+//             onPressed: () {
+//               _auth.signOut();
+//               Navigator.pushAndRemoveUntil(
+//                 context,
+//                 MaterialPageRoute(builder: (context) => LoginPage()),
+//                 (route) => false,
+//               );
+//             },
+//             style: ElevatedButton.styleFrom(
+//               backgroundColor: Colors.red,
+//               foregroundColor: Colors.white,
+//             ),
+//             child: Text('Logout'),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:quietly/features/auth/view/login_screen.dart';
+import 'package:quietly/utils/methods/custom_snackbar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-// Mock class to simulate shared class data (in real app, this would be from Firebase/Firestore)
-class ClassManager {
-  static final List<ClassRoom> _classes = [
-    ClassRoom(
-      className: '9A Mathematics',
-      teacherName: 'Ms. Sarah Johnson',
-      subject: 'Mathematics',
-      studentDeviceIds: ['DEV001', 'DEV002', 'DEV003'],
-    ),
-    ClassRoom(
-      className: '10B Science',
-      teacherName: 'Mr. David Wilson',
-      subject: 'Science',
-      studentDeviceIds: ['DEV004', 'DEV005'],
-    ),
-    ClassRoom(
-      className: '8C English',
-      teacherName: 'Mrs. Emily Brown',
-      subject: 'English',
-      studentDeviceIds: ['DEV006', 'DEV007', 'DEV008'],
-    ),
-    ClassRoom(
-      className: '11A Physics',
-      teacherName: 'Dr. Robert Smith',
-      subject: 'Physics',
-      studentDeviceIds: ['DEV009', 'DEV010'],
-    ),
-  ];
-
-  static List<ClassRoom> get classes => _classes;
-
-  static void addClass(ClassRoom newClass) {
-    _classes.add(newClass);
-  }
-
-  static void removeClass(String className) {
-    _classes.removeWhere((c) => c.className == className);
-  }
-
-  static List<ClassRoom> getClassesByTeacher(String teacherName) {
-    return _classes.where((c) => c.teacherName == teacherName).toList();
-  }
-
-  static List<ClassRoom> searchClasses(String query) {
-    if (query.isEmpty) return _classes;
-    return _classes
-        .where(
-          (c) =>
-              c.className.toLowerCase().contains(query.toLowerCase()) ||
-              c.subject.toLowerCase().contains(query.toLowerCase()) ||
-              c.teacherName.toLowerCase().contains(query.toLowerCase()),
-        )
-        .toList();
-  }
+class TeacherProfile extends StatefulWidget {
+  @override
+  _TeacherProfileState createState() => _TeacherProfileState();
 }
 
-class ClassRoom {
-  final String className;
-  final String teacherName;
-  final String subject;
-  final List<String> studentDeviceIds;
+class _TeacherProfileState extends State<TeacherProfile> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  File? _profileImage;
 
-  ClassRoom({
-    required this.className,
-    required this.teacherName,
-    required this.subject,
-    required this.studentDeviceIds,
-  });
-}
+  Map<String, dynamic>? userData;
+  bool isLoading = true;
+  List<Map<String, dynamic>> userClasses = [];
 
-class TeacherProfile extends StatelessWidget {
-  final String currentTeacherName = 'Ms. Sarah Johnson';
-  final String currentTeacherId = 'TEACH2024001';
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+    _loadSavedProfileImage();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final userDoc = await _firestore.collection('Users').doc(user.uid).get();
+
+      if (userDoc.exists) {
+        setState(() {
+          userData = userDoc.data();
+        });
+
+        if (userData?['role'] == 'teacher') {
+          await _loadTeacherClasses();
+        }
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Failed to load profile data',
+          status: SnackStatus.error,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadTeacherClasses() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final classesSnapshot = await _firestore
+          .collection('Classes')
+          .where('teacherId', isEqualTo: user.uid)
+          .get();
+
+      setState(() {
+        userClasses = classesSnapshot.docs
+            .map((doc) => {'id': doc.id, ...doc.data()})
+            .toList();
+      });
+    } catch (e) {
+      print('Error loading classes: $e');
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      File imageFile = File(pickedFile.path);
+      List<int> imageBytes = await imageFile.readAsBytes();
+      String base64Image = base64Encode(imageBytes);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('teacher_profile_image', base64Image);
+
+      setState(() {
+        _profileImage = imageFile;
+      });
+    }
+  }
+
+  Future<void> _loadSavedProfileImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final imageString = prefs.getString('teacher_profile_image');
+
+    if (imageString != null) {
+      final bytes = base64Decode(imageString);
+      final tempDir = Directory.systemTemp;
+      final tempFile = await File('${tempDir.path}/profile.png').create();
+      await tempFile.writeAsBytes(bytes);
+
+      setState(() {
+        _profileImage = tempFile;
+      });
+    }
+  }
+
+  Future<void> _updateProfile(Map<String, dynamic> updates) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      await _firestore.collection('Users').doc(user.uid).update(updates);
+
+      setState(() {
+        userData = {...?userData, ...updates};
+      });
+
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Profile updated successfully',
+          status: SnackStatus.success,
+        );
+      }
+    } catch (e) {
+      print('Error updating profile: $e');
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Failed to update profile',
+          status: SnackStatus.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _createClass(Map<String, dynamic> classData) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      await _firestore.collection('Classes').add({
+        ...classData,
+        'teacherId': user.uid,
+        'teacherName': userData?['name'] ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      await _loadTeacherClasses();
+
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Class created successfully',
+          status: SnackStatus.success,
+        );
+      }
+    } catch (e) {
+      print('Error creating class: $e');
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Failed to create class',
+          status: SnackStatus.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _updateClass(
+    String classId,
+    Map<String, dynamic> updates,
+  ) async {
+    try {
+      await _firestore.collection('Classes').doc(classId).update(updates);
+      await _loadTeacherClasses();
+
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Class updated successfully',
+          status: SnackStatus.success,
+        );
+      }
+    } catch (e) {
+      print('Error updating class: $e');
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Failed to update class',
+          status: SnackStatus.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteClass(String classId) async {
+    try {
+      await _firestore.collection('Classes').doc(classId).delete();
+      await _loadTeacherClasses();
+
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Class deleted successfully',
+          status: SnackStatus.success,
+        );
+      }
+    } catch (e) {
+      print('Error deleting class: $e');
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Failed to delete class',
+          status: SnackStatus.error,
+        );
+      }
+    }
+  }
+
+  // Get student details from Users collection
+  Future<List<Map<String, dynamic>>> _getStudentDetails(
+    List<String> studentIds,
+  ) async {
+    List<Map<String, dynamic>> students = [];
+
+    for (String studentId in studentIds) {
+      try {
+        final studentDoc = await _firestore
+            .collection('Users')
+            .doc(studentId)
+            .get();
+        if (studentDoc.exists) {
+          students.add({
+            'id': studentId,
+            'name': studentDoc.data()?['name'] ?? 'Unknown',
+            'email': studentDoc.data()?['email'] ?? '',
+          });
+        }
+      } catch (e) {
+        print('Error fetching student $studentId: $e');
+      }
+    }
+
+    return students;
+  }
+
+  Future<void> _sendNotification(
+    String classId,
+    String title,
+    String message,
+  ) async {
+    try {
+      await _firestore.collection('Notifications').add({
+        'classId': classId,
+        'title': title,
+        'message': message,
+        'senderId': _auth.currentUser?.uid,
+        'senderName': userData?['name'] ?? '',
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+      });
+
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Notification sent successfully',
+          status: SnackStatus.success,
+        );
+      }
+    } catch (e) {
+      print('Error sending notification: $e');
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Failed to send notification',
+          status: SnackStatus.error,
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Profile'),
+          backgroundColor: Colors.purple,
+          foregroundColor: Colors.white,
+        ),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final isTeacher = userData?['role'] == 'teacher';
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Profile'),
         backgroundColor: Colors.purple,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(icon: Icon(Icons.refresh), onPressed: _loadUserData),
+        ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            SizedBox(height: 32),
+      body: RefreshIndicator(
+        onRefresh: _loadUserData,
+        child: SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              SizedBox(height: 32),
 
-            // Profile Picture
-            CircleAvatar(
-              radius: 60,
-              backgroundColor: Colors.purple,
-              child: Icon(Icons.person, size: 60, color: Colors.white),
-            ),
-            SizedBox(height: 16),
-
-            // Teacher Info
-            Text(
-              currentTeacherName,
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              currentTeacherId,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-            ),
-            SizedBox(height: 32),
-
-            // Profile Info Cards
-            _buildInfoCard(
-              icon: Icons.subject,
-              title: 'Subject',
-              value: 'Mathematics',
-            ),
-            _buildInfoCard(
-              icon: Icons.school,
-              title: 'Department',
-              value: 'Science & Mathematics',
-            ),
-            _buildInfoCard(
-              icon: Icons.work,
-              title: 'Experience',
-              value: '8 Years',
-            ),
-            _buildInfoCard(
-              icon: Icons.people,
-              title: 'My Classes',
-              value:
-                  '${ClassManager.getClassesByTeacher(currentTeacherName).length} Classes',
-            ),
-            _buildInfoCard(
-              icon: Icons.email,
-              title: 'Email',
-              value: 'sarah.johnson@school.edu',
-            ),
-            _buildInfoCard(
-              icon: Icons.phone,
-              title: 'Phone',
-              value: '+1 234 567 8900',
-            ),
-            SizedBox(height: 16),
-
-            // Manage Classes Button
-            _buildButton(
-              context,
-              label: 'Manage Classes',
-              icon: Icons.class_,
-              color: Colors.blue,
-              onPressed: () => _showManageClassesDialog(context),
-            ),
-            SizedBox(height: 12),
-
-            // Send Notification Button
-            _buildButton(
-              context,
-              label: 'Send Notification',
-              icon: Icons.notifications_active_outlined,
-              color: Colors.orange,
-              onPressed: () => _showNotificationDialog(context),
-            ),
-            SizedBox(height: 12),
-
-            // Edit Profile Button
-            _buildButton(
-              context,
-              label: 'Edit Profile',
-              color: Colors.purple,
-              onPressed: () {},
-            ),
-            SizedBox(height: 12),
-
-            // Logout Button
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton(
-                  onPressed: () => _showLogoutDialog(context),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.red, width: 2),
-                    foregroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              // Profile Picture
+              Center(
+                child: Stack(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.purple.withOpacity(0.3),
+                            blurRadius: 20,
+                            offset: Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.purple,
+                        backgroundImage: _profileImage != null
+                            ? FileImage(_profileImage!)
+                            : null,
+                        child: _profileImage == null
+                            ? Text(
+                                userData?['name']?.isNotEmpty == true
+                                    ? userData!['name'][0].toUpperCase()
+                                    : 'U',
+                                style: TextStyle(
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : null,
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    'Logout',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _pickImage,
+                        child: Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.purple,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                          ),
+                          child: Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 16),
+
+              // User Info
+              Text(
+                userData?['name'] ?? 'User',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                userData?['email'] ?? '',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+              ),
+              SizedBox(height: 8),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isTeacher ? Colors.purple : Colors.blue,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  isTeacher ? 'Teacher' : 'Student',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-            ),
-            SizedBox(height: 32),
-          ],
+              SizedBox(height: 32),
+
+              // Profile Info Cards
+              _buildInfoCard(
+                icon: Icons.person,
+                title: 'Username',
+                value: userData?['name'] ?? 'N/A',
+              ),
+              _buildInfoCard(
+                icon: Icons.email,
+                title: 'Email',
+                value: userData?['email'] ?? 'N/A',
+              ),
+              _buildInfoCard(
+                icon: Icons.badge,
+                title: 'Role',
+                value: isTeacher ? 'Teacher' : 'Student',
+              ),
+
+              if (isTeacher) ...[
+                _buildInfoCard(
+                  icon: Icons.class_,
+                  title: 'My Classes',
+                  value: '${userClasses.length} Classes',
+                ),
+              ],
+
+              SizedBox(height: 16),
+
+              // Teacher-specific buttons
+              if (isTeacher) ...[
+                _buildButton(
+                  context,
+                  label: 'Create New Class',
+                  icon: Icons.add_circle,
+                  color: Colors.blue,
+                  onPressed: () => _showCreateClassDialog(context),
+                ),
+                SizedBox(height: 12),
+                _buildButton(
+                  context,
+                  label: 'View All Classes & Students',
+                  icon: Icons.people,
+                  color: Colors.green,
+                  onPressed: () => _showManageClassesDialog(context),
+                ),
+                SizedBox(height: 12),
+                _buildButton(
+                  context,
+                  label: 'Send Notification',
+                  icon: Icons.notifications_active,
+                  color: Colors.orange,
+                  onPressed: () => _showNotificationDialog(context),
+                ),
+                SizedBox(height: 12),
+              ],
+
+              // Edit Profile Button
+              _buildButton(
+                context,
+                label: 'Edit Profile',
+                icon: Icons.edit,
+                color: Colors.purple,
+                onPressed: () => _showEditProfileDialog(context),
+              ),
+              SizedBox(height: 12),
+
+              // Logout Button
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton(
+                    onPressed: () => _showLogoutDialog(context),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.red, width: 2),
+                      foregroundColor: Colors.red,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Logout',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: 32),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // Common button builder
   Widget _buildButton(
     BuildContext context, {
     required String label,
@@ -285,388 +1794,433 @@ class TeacherProfile extends StatelessWidget {
     );
   }
 
-  // 🆕 Manage Classes Dialog - Create, View, Edit, Delete Classes
+  void _showEditProfileDialog(BuildContext context) {
+    final _nameController = TextEditingController(text: userData?['name']);
+    final _emailController = TextEditingController(text: userData?['email']);
+    final _formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.edit, color: Colors.purple),
+            SizedBox(width: 12),
+            Text('Edit Profile'),
+          ],
+        ),
+        content: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: 'Name',
+                  prefixIcon: Icon(Icons.person),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your name';
+                  }
+                  if (value.length < 3) {
+                    return 'Name must be at least 3 characters';
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 10),
+              TextFormField(
+                controller: _emailController,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your email';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (_formKey.currentState!.validate()) {
+                await _updateProfile({
+                  'name': _nameController.text.trim(),
+                  'email': _emailController.text.trim(),
+                });
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // View Classes and Students Dialog
   void _showManageClassesDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.class_, color: Colors.blue),
-              SizedBox(width: 12),
-              Text('Manage My Classes'),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Create New Class Button
-                ElevatedButton.icon(
-                  onPressed: () => _showCreateClassDialog(context, setState),
-                  icon: Icon(Icons.add),
-                  label: Text('Create New Class'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.people, color: Colors.green),
+            SizedBox(width: 12),
+            Text('My Classes & Students'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: userClasses.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.class_, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text(
+                        'No classes yet',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
                   ),
-                ),
-                SizedBox(height: 16),
-
-                // My Classes List
-                Text(
-                  'My Classes (${ClassManager.getClassesByTeacher(currentTeacherName).length})',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 8),
-
-                Container(
-                  height: 200,
-                  child: ListView.builder(
-                    itemCount: ClassManager.getClassesByTeacher(
-                      currentTeacherName,
-                    ).length,
-                    itemBuilder: (context, index) {
-                      final classRoom = ClassManager.getClassesByTeacher(
-                        currentTeacherName,
-                      )[index];
-                      return Card(
-                        margin: EdgeInsets.symmetric(vertical: 4),
-                        child: ListTile(
-                          leading: Icon(Icons.class_, color: Colors.blue),
-                          title: Text(classRoom.className),
-                          subtitle: Text(
-                            '${classRoom.studentDeviceIds.length} students',
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: Icon(Icons.edit, color: Colors.orange),
-                                onPressed: () => _showEditClassDialog(
-                                  context,
-                                  setState,
-                                  classRoom,
-                                ),
-                              ),
-                              IconButton(
-                                icon: Icon(Icons.delete, color: Colors.red),
-                                onPressed: () {
-                                  setState(() {
-                                    ClassManager.removeClass(
-                                      classRoom.className,
-                                    );
-                                  });
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Class ${classRoom.className} deleted',
+                )
+              : ListView.builder(
+                  itemCount: userClasses.length,
+                  itemBuilder: (context, index) {
+                    final classData = userClasses[index];
+                    return Card(
+                      margin: EdgeInsets.symmetric(vertical: 8),
+                      elevation: 2,
+                      child: ExpansionTile(
+                        leading: Icon(Icons.class_, color: Colors.blue),
+                        title: Text(
+                          classData['className'] ?? 'Unnamed Class',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '${(classData['studentIds'] as List?)?.length ?? 0} students',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.person_add, color: Colors.green),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _showAddStudentDialog(context, classData);
+                              },
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete, color: Colors.red),
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text('Delete Class'),
+                                    content: Text(
+                                      'Are you sure you want to delete this class?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: Text('Cancel'),
                                       ),
-                                      backgroundColor: Colors.red,
+                                      ElevatedButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                        ),
+                                        child: Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (confirm == true) {
+                                  await _deleteClass(classData['id']);
+                                  Navigator.pop(context);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        children: [
+                          FutureBuilder<List<Map<String, dynamic>>>(
+                            future: _getStudentDetails(
+                              List<String>.from(classData['studentIds'] ?? []),
+                            ),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              }
+
+                              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                return Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Center(
+                                    child: Text(
+                                      'No students in this class',
+                                      style: TextStyle(color: Colors.grey),
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              return Column(
+                                children: snapshot.data!.map((student) {
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: Colors.green,
+                                      child: Text(
+                                        student['name'][0].toUpperCase(),
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ),
+                                    title: Text(student['name']),
+                                    subtitle: Text(student['email']),
+                                    trailing: IconButton(
+                                      icon: Icon(
+                                        Icons.remove_circle,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () async {
+                                        List<String> updatedStudents =
+                                            List<String>.from(
+                                              classData['studentIds'] ?? [],
+                                            );
+                                        updatedStudents.remove(student['id']);
+
+                                        await _updateClass(classData['id'], {
+                                          'studentIds': updatedStudents,
+                                        });
+
+                                        Navigator.pop(context);
+                                        _showManageClassesDialog(context);
+                                      },
                                     ),
                                   );
-                                },
-                              ),
-                            ],
+                                }).toList(),
+                              );
+                            },
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Close', style: TextStyle(color: Colors.grey)),
-            ),
-          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
       ),
     );
   }
 
-  // Create Class Dialog
-  void _showCreateClassDialog(BuildContext context, StateSetter setState) {
-    final _classNameController = TextEditingController();
-    final _subjectController = TextEditingController();
-    final _deviceIdController = TextEditingController();
-    List<String> students = [];
+  // Create Class Dialog (Simplified - removed subject and device ID)
+  void _showCreateClassDialog(BuildContext context) {
+    final TextEditingController _classNameController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, dialogSetState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.add_circle, color: Colors.blue),
-              SizedBox(width: 12),
-              Text('Create New Class'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: _classNameController,
-                  decoration: InputDecoration(
-                    labelText: 'Class Name',
-                    hintText: 'e.g., 9A Mathematics',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 12),
-                TextField(
-                  controller: _subjectController,
-                  decoration: InputDecoration(
-                    labelText: 'Subject',
-                    hintText: 'e.g., Mathematics, Science',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 16),
-
-                // Add Student Section
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _deviceIdController,
-                        decoration: InputDecoration(
-                          labelText: 'Student Device ID',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        final id = _deviceIdController.text.trim();
-                        if (id.isNotEmpty && !students.contains(id)) {
-                          dialogSetState(() {
-                            students.add(id);
-                            _deviceIdController.clear();
-                          });
-                        }
-                      },
-                      child: Icon(Icons.add),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12),
-
-                // Students List
-                Text('Students (${students.length})'),
-                Container(
-                  height: 120,
-                  child: ListView.builder(
-                    itemCount: students.length,
-                    itemBuilder: (context, index) => ListTile(
-                      leading: Icon(Icons.person, color: Colors.green),
-                      title: Text(students[index]),
-                      trailing: IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red),
-                        onPressed: () {
-                          dialogSetState(() => students.removeAt(index));
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (_classNameController.text.isNotEmpty &&
-                    _subjectController.text.isNotEmpty) {
-                  final newClass = ClassRoom(
-                    className: _classNameController.text,
-                    teacherName: currentTeacherName,
-                    subject: _subjectController.text,
-                    studentDeviceIds: students,
-                  );
-
-                  ClassManager.addClass(newClass);
-                  setState(() {}); // Refresh parent dialog
-                  Navigator.pop(context);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Class ${_classNameController.text} created successfully!',
-                      ),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              },
-              child: Text('Create Class'),
-            ),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.add_circle, color: Colors.blue),
+            SizedBox(width: 12),
+            Text('Create New Class'),
           ],
         ),
+        content: TextField(
+          controller: _classNameController,
+          decoration: InputDecoration(
+            labelText: 'Class Name',
+            hintText: 'e.g., Grade 9A, Physics 101',
+            prefixIcon: Icon(Icons.class_),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final className = _classNameController.text.trim();
+
+              if (className.isEmpty) {
+                showCustomSnackBar(
+                  context: context,
+                  message: 'Please enter a class name',
+                  status: SnackStatus.error,
+                );
+                return;
+              }
+
+              await _createClass({
+                'className': className,
+                'studentIds': [], // Empty student list initially
+              });
+
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Create'),
+          ),
+        ],
       ),
     );
   }
 
-  // Edit Class Dialog
-  void _showEditClassDialog(
+  // Add Student to Class Dialog
+  void _showAddStudentDialog(
     BuildContext context,
-    StateSetter setState,
-    ClassRoom classRoom,
+    Map<String, dynamic> classData,
   ) {
-    final _deviceIdController = TextEditingController();
-    List<String> students = List.from(classRoom.studentDeviceIds);
-
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, dialogSetState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.edit, color: Colors.orange),
-              SizedBox(width: 12),
-              Text('Edit ${classRoom.className}'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: Icon(Icons.person, color: Colors.purple),
-                  title: Text('Teacher'),
-                  subtitle: Text(classRoom.teacherName),
-                ),
-                ListTile(
-                  leading: Icon(Icons.subject, color: Colors.purple),
-                  title: Text('Subject'),
-                  subtitle: Text(classRoom.subject),
-                ),
-                SizedBox(height: 16),
-
-                // Add Student Section
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _deviceIdController,
-                        decoration: InputDecoration(
-                          labelText: 'Add Student Device ID',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        final id = _deviceIdController.text.trim();
-                        if (id.isNotEmpty && !students.contains(id)) {
-                          dialogSetState(() {
-                            students.add(id);
-                            _deviceIdController.clear();
-                          });
-                        }
-                      },
-                      child: Icon(Icons.add),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12),
-
-                // Students List
-                Text('Students (${students.length})'),
-                Container(
-                  height: 150,
-                  child: ListView.builder(
-                    itemCount: students.length,
-                    itemBuilder: (context, index) => ListTile(
-                      leading: Icon(Icons.person, color: Colors.green),
-                      title: Text(students[index]),
-                      trailing: IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red),
-                        onPressed: () {
-                          dialogSetState(() => students.removeAt(index));
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // Update class with new student list
-                final updatedClass = ClassRoom(
-                  className: classRoom.className,
-                  teacherName: classRoom.teacherName,
-                  subject: classRoom.subject,
-                  studentDeviceIds: students,
-                );
-
-                ClassManager.removeClass(classRoom.className);
-                ClassManager.addClass(updatedClass);
-                setState(() {}); // Refresh parent dialog
-                Navigator.pop(context);
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Class ${classRoom.className} updated!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
-              child: Text('Save Changes'),
-            ),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.person_add, color: Colors.green),
+            SizedBox(width: 12),
+            Text('Add Student'),
           ],
         ),
+        content: FutureBuilder<QuerySnapshot>(
+          future: _firestore
+              .collection('Users')
+              .where('role', isEqualTo: 'student')
+              .get(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
+
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return Text('No students available');
+            }
+
+            final allStudents = snapshot.data!.docs;
+            final currentStudentIds = List<String>.from(
+              classData['studentIds'] ?? [],
+            );
+
+            // Filter out students already in the class
+            final availableStudents = allStudents
+                .where((doc) => !currentStudentIds.contains(doc.id))
+                .toList();
+
+            if (availableStudents.isEmpty) {
+              return Text('All students are already in this class');
+            }
+
+            return SizedBox(
+              width: double.maxFinite,
+              height: 300,
+              child: ListView.builder(
+                itemCount: availableStudents.length,
+                itemBuilder: (context, index) {
+                  final student = availableStudents[index];
+                  final studentData = student.data() as Map<String, dynamic>;
+
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.blue,
+                      child: Text(
+                        (studentData['name'] ?? 'S')[0].toUpperCase(),
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                    title: Text(studentData['name'] ?? 'Unknown'),
+                    subtitle: Text(studentData['email'] ?? ''),
+                    trailing: ElevatedButton(
+                      onPressed: () async {
+                        List<String> updatedStudents = List<String>.from(
+                          currentStudentIds,
+                        );
+                        updatedStudents.add(student.id);
+
+                        await _updateClass(classData['id'], {
+                          'studentIds': updatedStudents,
+                        });
+
+                        Navigator.pop(context);
+                        showCustomSnackBar(
+                          context: context,
+                          message: 'Student added successfully',
+                          status: SnackStatus.success,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text('Add'),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
       ),
     );
   }
 
-  // Enhanced Notification Dialog with Integrated Search in Dropdown
   void _showNotificationDialog(BuildContext context) {
     final _titleController = TextEditingController();
     final _messageController = TextEditingController();
     final _formKey = GlobalKey<FormState>();
-
-    ClassRoom? selectedClass;
+    Map<String, dynamic>? selectedClass;
 
     showDialog(
       context: context,
@@ -687,84 +2241,31 @@ class TeacherProfile extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Class Selection Dropdown with Search
-                DropdownButtonFormField<ClassRoom>(
+                DropdownButtonFormField<Map<String, dynamic>>(
                   decoration: InputDecoration(
                     labelText: 'Select Class',
-                    prefixIcon: Icon(Icons.search, color: Colors.orange),
+                    prefixIcon: Icon(Icons.class_),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    suffixIcon: selectedClass != null
-                        ? IconButton(
-                            icon: Icon(Icons.clear, color: Colors.grey),
-                            onPressed: () {
-                              setState(() {
-                                selectedClass = null;
-                              });
-                            },
-                          )
-                        : null,
                   ),
                   value: selectedClass,
-                  isExpanded: true,
-                  items: [
-                    // Search hint item
-                    DropdownMenuItem(
-                      value: null,
-                      enabled: false,
-                      child: Text(
-                        'Type to search classes...',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                    ...ClassManager.classes.map(
-                      (classRoom) => DropdownMenuItem(
-                        value: classRoom,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              classRoom.className,
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              '${classRoom.teacherName} • ${classRoom.subject} • ${classRoom.studentDeviceIds.length} students',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) => setState(() {
-                    selectedClass = value;
-                  }),
+                  items: userClasses.map((classData) {
+                    return DropdownMenuItem(
+                      value: classData,
+                      child: Text(classData['className']),
+                    );
+                  }).toList(),
+                  onChanged: (value) => setState(() => selectedClass = value),
                   validator: (value) =>
                       value == null ? 'Please select a class' : null,
-
-                  // Custom searchable dropdown behavior
-                  onTap: () {
-                    // Show search dialog when dropdown is tapped
-                    _showClassSearchDialog(context, setState, (
-                      ClassRoom? newSelectedClass,
-                    ) {
-                      setState(() {
-                        selectedClass = newSelectedClass;
-                      });
-                    }, selectedClass);
-                  },
                 ),
                 SizedBox(height: 16),
-
                 TextFormField(
                   controller: _titleController,
                   decoration: InputDecoration(
                     labelText: 'Title',
-                    prefixIcon: Icon(Icons.title, color: Colors.orange),
+                    prefixIcon: Icon(Icons.title),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -772,13 +2273,12 @@ class TeacherProfile extends StatelessWidget {
                   validator: (v) => v!.isEmpty ? 'Enter a title' : null,
                 ),
                 SizedBox(height: 16),
-
                 TextFormField(
                   controller: _messageController,
                   maxLines: 3,
                   decoration: InputDecoration(
                     labelText: 'Message',
-                    prefixIcon: Icon(Icons.message, color: Colors.orange),
+                    prefixIcon: Icon(Icons.message),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -791,143 +2291,24 @@ class TeacherProfile extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey)),
+              child: Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (_formKey.currentState!.validate()) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Notification sent to ${selectedClass!.className} (${selectedClass!.studentDeviceIds.length} students) successfully!',
-                      ),
-                      backgroundColor: Colors.orange,
-                    ),
+                  await _sendNotification(
+                    selectedClass!['id'],
+                    _titleController.text,
+                    _messageController.text,
                   );
-
-                  print('Class: ${selectedClass!.className}');
-                  print('Teacher: ${selectedClass!.teacherName}');
-                  print('Students: ${selectedClass!.studentDeviceIds}');
-                  print('Title: ${_titleController.text}');
-                  print('Message: ${_messageController.text}');
+                  Navigator.pop(context);
                 }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
               ),
-              child: Text('Send Notification'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Class Search Dialog for the dropdown - FIXED VERSION
-  void _showClassSearchDialog(
-    BuildContext context,
-    StateSetter setState,
-    Function(ClassRoom?) onClassSelected,
-    ClassRoom? currentlySelected,
-  ) {
-    final _searchController = TextEditingController();
-    List<ClassRoom> _filteredClasses = ClassManager.classes;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, dialogSetState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.search, color: Colors.orange),
-              SizedBox(width: 12),
-              Text('Search Class'),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Search Field
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    labelText: 'Search by class, subject, or teacher',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(Icons.clear),
-                            onPressed: () {
-                              dialogSetState(() {
-                                _searchController.clear();
-                                _filteredClasses = ClassManager.classes;
-                              });
-                            },
-                          )
-                        : null,
-                  ),
-                  onChanged: (value) {
-                    dialogSetState(() {
-                      _filteredClasses = ClassManager.searchClasses(value);
-                    });
-                  },
-                ),
-                SizedBox(height: 16),
-
-                // Classes List
-                Container(
-                  height: 300,
-                  child: ListView.builder(
-                    itemCount: _filteredClasses.length,
-                    itemBuilder: (context, index) {
-                      final classRoom = _filteredClasses[index];
-                      return Card(
-                        margin: EdgeInsets.symmetric(vertical: 4),
-                        color:
-                            currentlySelected?.className == classRoom.className
-                            ? Colors.orange.withOpacity(0.1)
-                            : null,
-                        child: ListTile(
-                          leading: Icon(Icons.class_, color: Colors.blue),
-                          title: Text(
-                            classRoom.className,
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            '${classRoom.teacherName} • ${classRoom.subject} • ${classRoom.studentDeviceIds.length} students',
-                          ),
-                          trailing:
-                              currentlySelected?.className ==
-                                  classRoom.className
-                              ? Icon(Icons.check, color: Colors.green)
-                              : null,
-                          onTap: () {
-                            onClassSelected(classRoom);
-                            Navigator.pop(context); // Close search dialog
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Cancel'),
+              child: Text('Send'),
             ),
           ],
         ),
@@ -955,8 +2336,7 @@ class TeacherProfile extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              // Navigator.pop(context);
-              FirebaseAuth.instance.signOut();
+              _auth.signOut();
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => LoginPage()),
@@ -966,9 +2346,6 @@ class TeacherProfile extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
             ),
             child: Text('Logout'),
           ),

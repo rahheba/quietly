@@ -27,6 +27,8 @@ class _SignupPageState extends State<SignupPage> {
   final Color textPrimary = Color(0xFF2C1810); // Very Dark Brown
   final Color textSecondary = Color(0xFF6B4423); // Dark Brown
   bool _isStudent = true;
+  String? _selectedClass;
+  List<String> _classOptions = ['BCA', 'BCom', 'BA', 'BSc', 'BBA'];
 
   @override
   void dispose() {
@@ -402,6 +404,58 @@ class _SignupPageState extends State<SignupPage> {
                         return null;
                       },
                     ),
+
+                    SizedBox(height: 20),
+                    // Show Class Dropdown only for Students
+                    if (_isStudent)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Color(0xFFE2E8F0),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedClass,
+                          decoration: InputDecoration(
+                            labelText: 'Select Class',
+                            labelStyle: TextStyle(
+                              color: textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            border: InputBorder.none,
+                          ),
+                          items: _classOptions.map((className) {
+                            return DropdownMenuItem(
+                              value: className,
+                              child: Text(
+                                className,
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedClass = value;
+                            });
+                          },
+                          validator: (value) {
+                            if (_isStudent && value == null) {
+                              return 'Please select your class';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
 
                     SizedBox(height: 20),
 
