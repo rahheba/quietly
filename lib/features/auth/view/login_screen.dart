@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:quietly/admin/admin_dashboard.dart';
 import 'package:quietly/features/auth/view/sign_up_screen.dart';
+import 'package:quietly/features/parent/parent_home.dart';
 import 'package:quietly/features/teacher/bottomnav/teacher_bottom_nav_screen.dart';
 import 'package:quietly/utils/methods/custom_snackbar.dart';
 import '../../bottom_nav/bottom_nav.dart';
@@ -339,6 +341,12 @@ class _LoginPageState extends State<LoginPage> {
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AdminDashboard(),
+                            ),
+                          );
                           // TODO: Implement forgot password
                         },
                         style: TextButton.styleFrom(
