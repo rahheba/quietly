@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:quietly/admin/admin_dashboard.dart';
+import 'package:quietly/admin/home/home_screen.dart';
 import 'package:quietly/features/auth/view/login_screen.dart';
 import 'package:quietly/features/bottom_nav/bottom_nav.dart';
 import 'package:quietly/features/teacher/bottomnav/teacher_bottom_nav_screen.dart';
@@ -38,7 +40,12 @@ class _SplashScreenState extends State<SplashScreen> {
           String role = userDoc.get('role') ?? 'student';
 
           // Navigate based on role
-          if (role == 'teacher') {
+          if (role == 'admin') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => AdminDashboard()),
+            );
+          } else if (role == 'teacher') {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => TeacherBottomNav()),

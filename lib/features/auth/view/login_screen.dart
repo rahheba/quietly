@@ -71,7 +71,13 @@ class _LoginPageState extends State<LoginPage> {
             );
 
             // Navigate based on role
-            if (role == 'teacher') {
+            if (role == 'admin') {
+Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => AdminDashboard()),
+              );
+            }
+            else if (role == 'teacher') {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => TeacherBottomNav()),

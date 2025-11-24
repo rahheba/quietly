@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:quietly/admin/home/home_screen.dart';
+import 'package:quietly/features/auth/view/login_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -22,7 +24,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void initState() {
     super.initState();
     _pages = const [
-      AdminOverviewPage(),
+      AdminHomeScreen(),
       StudentManagementPage(),
       ParentManagementPage(),
       TeacherManagementPage(),
@@ -49,7 +51,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.admin_panel_settings, color: Colors.white),
+              child: const Icon(
+                Icons.admin_panel_settings,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(width: 12),
             Column(
@@ -80,7 +85,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
             icon: const Icon(Icons.logout, color: Colors.grey),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-              Navigator.of(context).pushReplacementNamed('/login');
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => LoginPage()),
+                (route) => false,
+              );
             },
           ),
         ],
@@ -94,10 +102,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
               unselectedItemColor: Colors.grey,
               onTap: (index) => setState(() => _selectedIndex = index),
               items: const [
-                BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Overview'),
-                BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Students'),
-                BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Parents'),
-                BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Teachers'),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.dashboard),
+                  label: 'Overview',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.school),
+                  label: 'Students',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.people),
+                  label: 'Parents',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person),
+                  label: 'Teachers',
+                ),
               ],
             )
           : null,
@@ -109,7 +129,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
               children: [
                 NavigationRail(
                   selectedIndex: _selectedIndex,
-                  onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+                  onDestinationSelected: (index) =>
+                      setState(() => _selectedIndex = index),
                   backgroundColor: Colors.white,
                   selectedIconTheme: IconThemeData(color: primaryColor),
                   unselectedIconTheme: const IconThemeData(color: Colors.grey),
@@ -146,86 +167,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
 }
 
 /// ------------------------------
-/// OVERVIEW PAGE
-/// ------------------------------
-class AdminOverviewPage extends StatelessWidget {
-  const AdminOverviewPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isMobile = MediaQuery.of(context).size.width < 600;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Overview', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 24),
-
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('Users').snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (!snapshot.hasData) {
-                return const Center(child: Text('No data available'));
-              }
-
-              final users = snapshot.data!.docs;
-              final int studentCount = users.where((u) => (u.data()['role'] ?? '') == 'student').length;
-              final int teacherCount = users.where((u) => (u.data()['role'] ?? '') == 'teacher').length;
-              final int parentCount = users.where((u) => (u.data()['role'] ?? '') == 'parent').length;
-
-              return GridView.count(
-                crossAxisCount: isMobile ? 1 : 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: isMobile ? 2.8 : 1.5,
-                children: [
-                  _buildStatCard('Total Students', studentCount.toString(), Icons.school, Colors.blue),
-                  _buildStatCard('Total Teachers', teacherCount.toString(), Icons.person, Colors.green),
-                  _buildStatCard('Total Parents', parentCount.toString(), Icons.people, const Color.fromARGB(255, 126, 83, 18)),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Icon(icon, color: color, size: 40),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-              const SizedBox(height: 4),
-              Text(value, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// ------------------------------
 /// STUDENT MANAGEMENT PAGE
 /// ------------------------------
 class StudentManagementPage extends StatefulWidget {
@@ -247,7 +188,10 @@ class _StudentManagementPageState extends State<StudentManagementPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Student Management', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+              const Text(
+                'Student Management',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
               ElevatedButton.icon(
                 onPressed: () => _showAddStudentDialog(context),
                 icon: const Icon(Icons.add),
@@ -255,8 +199,13 @@ class _StudentManagementPageState extends State<StudentManagementPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],
@@ -265,13 +214,21 @@ class _StudentManagementPageState extends State<StudentManagementPage> {
 
         Expanded(
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('Users').where('role', isEqualTo: 'student').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('Users')
+                .where('role', isEqualTo: 'student')
+                .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const Center(child: Text('No students found', style: TextStyle(fontSize: 18)));
+                return const Center(
+                  child: Text(
+                    'No students found',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                );
               }
 
               final docs = snapshot.data!.docs;
@@ -280,7 +237,12 @@ class _StudentManagementPageState extends State<StudentManagementPage> {
                 itemCount: docs.length,
                 itemBuilder: (context, index) {
                   final student = docs[index];
-                  return _buildUserCard(context, student, Icons.school, Colors.blue);
+                  return _buildUserCard(
+                    context,
+                    student,
+                    Icons.school,
+                    Colors.blue,
+                  );
                 },
               );
             },
@@ -300,96 +262,151 @@ class _StudentManagementPageState extends State<StudentManagementPage> {
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(builder: (context, setStateDialog) {
-          return AlertDialog(
-            title: const Text('Add New Student'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(labelText: 'Name', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: emailController,
-                    decoration: InputDecoration(labelText: 'Email', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: passwordController,
-                    obscureText: true,
-                    decoration: InputDecoration(labelText: 'Password', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: selectedClass,
-                    decoration: InputDecoration(labelText: 'Class', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                    items: classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                    onChanged: (v) => setStateDialog(() => selectedClass = v),
-                  ),
-                ],
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Add New Student'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        labelText: 'Name',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: emailController,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: passwordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedClass,
+                      decoration: InputDecoration(
+                        labelText: 'Class',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      items: classes
+                          .map(
+                            (c) => DropdownMenuItem(value: c, child: Text(c)),
+                          )
+                          .toList(),
+                      onChanged: (v) => setStateDialog(() => selectedClass = v),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            actions: [
-              TextButton(onPressed: () {
-                nameController.dispose();
-                emailController.dispose();
-                passwordController.dispose();
-                Navigator.pop(context);
-              }, child: const Text('Cancel')),
-              ElevatedButton(
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  final email = emailController.text.trim();
-                  final password = passwordController.text;
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    nameController.dispose();
+                    emailController.dispose();
+                    passwordController.dispose();
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    final email = emailController.text.trim();
+                    final password = passwordController.text;
 
-                  if (name.isEmpty || email.isEmpty || password.length < 6) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid name, email and password (>=6 chars)')));
-                    return;
-                  }
+                    if (name.isEmpty || email.isEmpty || password.length < 6) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Enter valid name, email and password (>=6 chars)',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
 
-                  try {
-                    final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email, password: password);
-                    final uid = userCredential.user?.uid;
-                    if (uid != null) {
-                      await FirebaseFirestore.instance.collection('Users').doc(uid).set({
-                        'uid': uid,
-                        'name': name,
-                        'email': email,
-                        'role': 'student',
-                        'class': selectedClass ?? '',
-                        'createdAt': FieldValue.serverTimestamp(),
-                      });
+                    try {
+                      final userCredential = await FirebaseAuth.instance
+                          .createUserWithEmailAndPassword(
+                            email: email,
+                            password: password,
+                          );
+                      final uid = userCredential.user?.uid;
+                      if (uid != null) {
+                        await FirebaseFirestore.instance
+                            .collection('Users')
+                            .doc(uid)
+                            .set({
+                              'uid': uid,
+                              'name': name,
+                              'email': email,
+                              'role': 'student',
+                              'class': selectedClass ?? '',
+                              'createdAt': FieldValue.serverTimestamp(),
+                            });
 
-                      nameController.dispose();
-                      emailController.dispose();
-                      passwordController.dispose();
+                        nameController.dispose();
+                        emailController.dispose();
+                        passwordController.dispose();
 
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Student added successfully'),
+                            ),
+                          );
+                        }
+                      }
+                    } catch (e) {
                       if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Student added successfully')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: ${e.toString()}')),
+                        );
                       }
                     }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-                child: const Text('Add'),
-              ),
-            ],
-          );
-        });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                  ),
+                  child: const Text('Add'),
+                ),
+              ],
+            );
+          },
+        );
       },
     );
   }
 
-  Widget _buildUserCard(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> user, IconData icon, Color color) {
+  Widget _buildUserCard(
+    BuildContext context,
+    QueryDocumentSnapshot<Map<String, dynamic>> user,
+    IconData icon,
+    Color color,
+  ) {
     final data = user.data();
     final String name = (data['name'] ?? 'N/A').toString();
     final String email = (data['email'] ?? 'N/A').toString();
@@ -398,31 +415,73 @@ class _StudentManagementPageState extends State<StudentManagementPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2))]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Row(
         children: [
-          CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Icon(icon, color: color)),
+          CircleAvatar(
+            backgroundColor: color.withOpacity(0.1),
+            child: Icon(icon, color: color),
+          ),
           const SizedBox(width: 16),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(email, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-              if (studentClass.isNotEmpty) const SizedBox(height: 4),
-              if (studentClass.isNotEmpty) Text('Class: $studentClass', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-            ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  email,
+                  style: const TextStyle(color: Colors.grey, fontSize: 14),
+                ),
+                if (studentClass.isNotEmpty) const SizedBox(height: 4),
+                if (studentClass.isNotEmpty)
+                  Text(
+                    'Class: $studentClass',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+              ],
+            ),
           ),
-          IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _showEditDialog(context, user)),
-          IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteUser(context, user.id)),
+          IconButton(
+            icon: const Icon(Icons.edit, color: Colors.blue),
+            onPressed: () => _showEditDialog(context, user),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.red),
+            onPressed: () => _deleteUser(context, user.id),
+          ),
         ],
       ),
     );
   }
 
-  void _showEditDialog(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> user) {
+  void _showEditDialog(
+    BuildContext context,
+    QueryDocumentSnapshot<Map<String, dynamic>> user,
+  ) {
     final data = user.data();
-    final nameController = TextEditingController(text: (data['name'] ?? '').toString());
-    final emailController = TextEditingController(text: (data['email'] ?? '').toString());
+    final nameController = TextEditingController(
+      text: (data['name'] ?? '').toString(),
+    );
+    final emailController = TextEditingController(
+      text: (data['email'] ?? '').toString(),
+    );
 
     showDialog(
       context: context,
@@ -431,22 +490,52 @@ class _StudentManagementPageState extends State<StudentManagementPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameController, decoration: InputDecoration(labelText: 'Name', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
             const SizedBox(height: 12),
-            TextField(controller: emailController, decoration: InputDecoration(labelText: 'Email', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+            TextField(
+              controller: emailController,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () { nameController.dispose(); emailController.dispose(); Navigator.pop(context); }, child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              nameController.dispose();
+              emailController.dispose();
+              Navigator.pop(context);
+            },
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               final newName = nameController.text.trim();
               final newEmail = emailController.text.trim();
               if (newName.isEmpty || newEmail.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name and email cannot be empty')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Name and email cannot be empty'),
+                  ),
+                );
                 return;
               }
-              await FirebaseFirestore.instance.collection('Users').doc(user.id).update({'name': newName, 'email': newEmail});
+              await FirebaseFirestore.instance
+                  .collection('Users')
+                  .doc(user.id)
+                  .update({'name': newName, 'email': newEmail});
               nameController.dispose();
               emailController.dispose();
               if (context.mounted) Navigator.pop(context);
@@ -466,10 +555,16 @@ class _StudentManagementPageState extends State<StudentManagementPage> {
         title: const Text('Delete User'),
         content: const Text('Are you sure you want to delete this user?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
-              await FirebaseFirestore.instance.collection('Users').doc(userId).delete();
+              await FirebaseFirestore.instance
+                  .collection('Users')
+                  .doc(userId)
+                  .delete();
               if (context.mounted) Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -496,22 +591,37 @@ class ParentManagementPage extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Parent Management', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+              const Text(
+                'Parent Management',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
               ElevatedButton.icon(
                 onPressed: () {},
                 icon: const Icon(Icons.add),
                 label: const Text('Add Parent'),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6B4423), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6B4423),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                ),
               ),
             ],
           ),
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('Users').where('role', isEqualTo: 'parent').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('Users')
+                .where('role', isEqualTo: 'parent')
+                .snapshots(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('No parents found'));
+              if (snapshot.connectionState == ConnectionState.waiting)
+                return const Center(child: CircularProgressIndicator());
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+                return const Center(child: Text('No parents found'));
 
               final docs = snapshot.data!.docs;
               return ListView.builder(
@@ -526,16 +636,28 @@ class ParentManagementPage extends StatelessWidget {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: ListTile(
-                      leading: CircleAvatar(backgroundColor: Colors.orange.withOpacity(0.1), child: const Icon(Icons.people, color: Colors.orange)),
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.orange.withOpacity(0.1),
+                        child: const Icon(Icons.people, color: Colors.orange),
+                      ),
                       title: Text(name),
                       subtitle: Text(email),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () {}),
-                          IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () {}),
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () {},
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {},
+                          ),
                         ],
                       ),
                     ),
@@ -565,22 +687,37 @@ class TeacherManagementPage extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Teacher Management', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+              const Text(
+                'Teacher Management',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
               ElevatedButton.icon(
                 onPressed: () {},
                 icon: const Icon(Icons.add),
                 label: const Text('Add Teacher'),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6B4423), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6B4423),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
+                ),
               ),
             ],
           ),
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('Users').where('role', isEqualTo: 'teacher').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('Users')
+                .where('role', isEqualTo: 'teacher')
+                .snapshots(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('No teachers found'));
+              if (snapshot.connectionState == ConnectionState.waiting)
+                return const Center(child: CircularProgressIndicator());
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+                return const Center(child: Text('No teachers found'));
 
               final docs = snapshot.data!.docs;
               return ListView.builder(
@@ -595,16 +732,28 @@ class TeacherManagementPage extends StatelessWidget {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: ListTile(
-                      leading: CircleAvatar(backgroundColor: Colors.green.withOpacity(0.1), child: const Icon(Icons.person, color: Colors.green)),
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.green.withOpacity(0.1),
+                        child: const Icon(Icons.person, color: Colors.green),
+                      ),
                       title: Text(name),
                       subtitle: Text(email),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () {}),
-                          IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () {}),
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () {},
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {},
+                          ),
                         ],
                       ),
                     ),
@@ -618,4 +767,3 @@ class TeacherManagementPage extends StatelessWidget {
     );
   }
 }
-
