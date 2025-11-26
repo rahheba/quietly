@@ -1,16 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:quietly/admin/class/classlist_screen.dart';
+import 'package:quietly/features/admin/class/classlist_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
-  const AdminHomeScreen({super.key});
-
+  AdminHomeScreen({super.key, this.onnavstd});
+  VoidCallback? onnavstd;
+  
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 600;
 
     return Container(
       width: double.infinity,
-
       decoration: BoxDecoration(color: Colors.white),
       child: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 32),
@@ -56,24 +57,29 @@ class AdminHomeScreen extends StatelessWidget {
     return ListView(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-
       children: [
-        _buildStatCard(
-          ontap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => ClassesListScreen()),
+        StreamBuilder(
+          stream: FirebaseFirestore.instance.collection('Classes').snapshots(),
+          builder: (context, asyncSnapshot) {
+            return _buildStatCard(
+              ontap: () {
+                if (onnavstd != null) onnavstd!();
+              },
+              title: 'Total Classes',
+              value: (asyncSnapshot.data == null || asyncSnapshot.data!.docs.isEmpty)
+                  ? '0'
+                  : asyncSnapshot.data!.docs.length.toString(),
+              icon: Icons.class_outlined,
+              gradientColors: [Color(0xFF667eea), Color(0xFF764ba2)],
+              iconBgColor: Color(0xFF667eea).withOpacity(0.1),
             );
           },
-          title: 'Total Classes',
-          value: '12',
-          icon: Icons.class_outlined,
-          gradientColors: [Color(0xFF667eea), Color(0xFF764ba2)],
-          iconBgColor: Color(0xFF667eea).withOpacity(0.1),
         ),
         SizedBox(height: 8),
         _buildStatCard(
-          ontap: () {},
+          ontap: () {
+            if (onnavstd != null) onnavstd!();
+          },
           title: 'Total Students',
           value: '245',
           icon: Icons.school_outlined,
@@ -81,13 +87,23 @@ class AdminHomeScreen extends StatelessWidget {
           iconBgColor: Color(0xFF4facfe).withOpacity(0.1),
         ),
         SizedBox(height: 8),
-        _buildStatCard(
-          ontap: () {},
-          title: 'Total Teachers',
-          value: '18',
-          icon: Icons.person_outline,
-          gradientColors: [Color(0xFF43e97b), Color(0xFF38f9d7)],
-          iconBgColor: Color(0xFF43e97b).withOpacity(0.1),
+        StreamBuilder(
+          stream: FirebaseFirestore.instance
+              .collection('Users')
+              .where('role', isEqualTo: 'teacher')
+              .snapshots(),
+          builder: (context, asyncSnapshot) {
+            return _buildStatCard(
+              ontap: () {},
+              title: 'Total Teachers',
+              value: (asyncSnapshot.data == null || asyncSnapshot.data!.docs.isEmpty)
+                  ? '0'
+                  : asyncSnapshot.data!.docs.length.toString(),
+              icon: Icons.person_outline,
+              gradientColors: [Color(0xFF43e97b), Color(0xFF38f9d7)],
+              iconBgColor: Color(0xFF43e97b).withOpacity(0.1),
+            );
+          },
         ),
       ],
     );
@@ -118,27 +134,21 @@ class AdminHomeScreen extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            // Gradient accent on top
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: 5,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: gradientColors,
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20),
-                      ),
+                Container(
+                  height: 5,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: gradientColors,
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
                     ),
                   ),
                 ),
@@ -156,8 +166,6 @@ class AdminHomeScreen extends StatelessWidget {
                         child: Icon(icon, color: gradientColors[0], size: 28),
                       ),
                       const SizedBox(height: 16),
-
-                      // Title and Value
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

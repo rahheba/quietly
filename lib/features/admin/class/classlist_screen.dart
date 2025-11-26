@@ -1,7 +1,8 @@
 import 'package:customtxt_mz/customtxt_mz.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:quietly/admin/class/addclass_screen.dart';
+import 'package:quietly/features/admin/class/addclass_screen.dart';
+import 'package:quietly/features/admin/class/classdetail_screen.dart';
 
 class ClassesListScreen extends StatelessWidget {
   const ClassesListScreen({Key? key}) : super(key: key);
@@ -9,11 +10,11 @@ class ClassesListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Classes'),
-        backgroundColor: Colors.blue,
-        elevation: 0,
-      ),
+      // appBar: AppBar(
+      //   title: const Text('Classes'),
+      //   backgroundColor: Colors.blue,
+      //   elevation: 0,
+      // ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('Classes').snapshots(),
         builder: (context, snapshot) {
@@ -95,34 +96,19 @@ class ClassesListScreen extends StatelessWidget {
                     status == 1 ? Icons.check_circle : Icons.cancel,
                     color: status == 1 ? Colors.green : Colors.grey,
                   ),
-                  onTap: () {
                     // Handle tap - navigate to detail screen or show details
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text(className),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Department: $departmentTitle'),
-                            const SizedBox(height: 8),
-                            Text('Code: $departmentCode'),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Status: ${status == 1 ? "Active" : "Inactive"}',
-                            ),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Close'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                   onTap: () {
+     Navigator.push(
+       context,
+       MaterialPageRoute(
+         builder: (context) => ClassDetailsScreen(
+           classId: document.id,
+           className: className,
+           departmentName: departmentTitle,
+         ),
+       ),
+     );
+   },
                 ),
               );
             },

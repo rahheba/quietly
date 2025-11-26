@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:quietly/admin/home/home_screen.dart';
+import 'package:quietly/features/admin/class/classlist_screen.dart';
+import 'package:quietly/features/admin/home/home_screen.dart';
+import 'package:quietly/features/admin/teacher/teacher_list_screen.dart';
 import 'package:quietly/features/auth/view/login_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -23,10 +25,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void initState() {
     super.initState();
-    _pages = const [
-      AdminHomeScreen(),
-      StudentManagementPage(),
-      ParentManagementPage(),
+    _pages = [
+      AdminHomeScreen(
+        onnavstd: () {
+          _selectedIndex = 1;
+          setState(() {
+            
+          });
+        },
+      ),
+      ClassesListScreen(),
+      // StudentManagementPage(),
+      // ParentManagementPage(),
       TeacherManagementPage(),
     ];
   }
@@ -108,12 +118,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.school),
-                  label: 'Students',
+                  label: 'classes',
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.people),
-                  label: 'Parents',
-                ),
+                // BottomNavigationBarItem(
+                //   icon: Icon(Icons.people),
+                //   label: 'Parents',
+                // ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.person),
                   label: 'Teachers',
@@ -146,11 +156,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       selectedIcon: Icon(Icons.school),
                       label: Text('Students'),
                     ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.people_outline),
-                      selectedIcon: Icon(Icons.people),
-                      label: Text('Parents'),
-                    ),
+                    // NavigationRailDestination(
+                    //   icon: Icon(Icons.people_outline),
+                    //   selectedIcon: Icon(Icons.people),
+                    //   label: Text('Parents'),
+                    // ),
                     NavigationRailDestination(
                       icon: Icon(Icons.person_outline),
                       selectedIcon: Icon(Icons.person),
@@ -644,102 +654,6 @@ class ParentManagementPage extends StatelessWidget {
                       leading: CircleAvatar(
                         backgroundColor: Colors.orange.withOpacity(0.1),
                         child: const Icon(Icons.people, color: Colors.orange),
-                      ),
-                      title: Text(name),
-                      subtitle: Text(email),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.blue),
-                            onPressed: () {},
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () {},
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// --------------------------------
-/// TEACHER MANAGEMENT PAGE
-/// --------------------------------
-class TeacherManagementPage extends StatelessWidget {
-  const TeacherManagementPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(24),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Teacher Management',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add),
-                label: const Text('Add Teacher'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6B4423),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 5,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
-                .collection('Users')
-                .where('role', isEqualTo: 'teacher')
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
-                return const Center(child: CircularProgressIndicator());
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
-                return const Center(child: Text('No teachers found'));
-
-              final docs = snapshot.data!.docs;
-              return ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                itemCount: docs.length,
-                itemBuilder: (context, index) {
-                  final teacher = docs[index];
-                  final data = teacher.data();
-                  final name = (data['name'] ?? 'N/A').toString();
-                  final email = (data['email'] ?? 'N/A').toString();
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.green.withOpacity(0.1),
-                        child: const Icon(Icons.person, color: Colors.green),
                       ),
                       title: Text(name),
                       subtitle: Text(email),

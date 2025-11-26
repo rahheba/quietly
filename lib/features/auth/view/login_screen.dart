@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:quietly/admin/admin_dashboard.dart';
+import 'package:quietly/features/admin/admin_dashboard.dart';
 import 'package:quietly/features/auth/view/sign_up_screen.dart';
 import 'package:quietly/features/parent/parent_home.dart';
 import 'package:quietly/features/teacher/bottomnav/teacher_bottom_nav_screen.dart';
@@ -72,12 +72,11 @@ class _LoginPageState extends State<LoginPage> {
 
             // Navigate based on role
             if (role == 'admin') {
-Navigator.pushReplacement(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => AdminDashboard()),
               );
-            }
-            else if (role == 'teacher') {
+            } else if (role == 'teacher') {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => TeacherBottomNav()),
@@ -341,35 +340,6 @@ Navigator.pushReplacement(
                         }
                         return null;
                       },
-                    ),
-                    SizedBox(height: 16),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => AdminDashboard(),
-                            ),
-                          );
-                          // TODO: Implement forgot password
-                        },
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                        ),
-                        child: Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            color: primaryColor,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
                     ),
                     SizedBox(height: 32),
                     Container(
