@@ -1,4 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:quietly/features/auth/view/login_screen.dart';
 
 class ParentProfileScreen extends StatefulWidget {
   const ParentProfileScreen({super.key});
@@ -8,10 +11,17 @@ class ParentProfileScreen extends StatefulWidget {
 }
 
 class _ParentProfileScreenState extends State<ParentProfileScreen> {
-  final TextEditingController _nameController = TextEditingController(text: 'Jennifer Johnson');
-  final TextEditingController _emailController = TextEditingController(text: 'jennifer.johnson@email.com');
-  final TextEditingController _phoneController = TextEditingController(text: '+1 (555) 123-4567');
-  
+  FirebaseAuth _auth = FirebaseAuth.instance;
+  final TextEditingController _nameController = TextEditingController(
+    text: 'Jennifer Johnson',
+  );
+  final TextEditingController _emailController = TextEditingController(
+    text: 'jennifer.johnson@email.com',
+  );
+  final TextEditingController _phoneController = TextEditingController(
+    text: '+1 (555) 123-4567',
+  );
+
   bool notificationsEnabled = true;
   bool emailNotifications = true;
   bool smsNotifications = false;
@@ -132,10 +142,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                     const SizedBox(height: 4),
                     const Text(
                       'Parent Account',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.grey, fontSize: 14),
                     ),
                   ],
                 ),
@@ -340,9 +347,18 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                         ),
                         TextButton(
                           onPressed: () {
-                            Navigator.pop(context);
+                            _auth.signOut();
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => LoginPage(),
+                              ),
+                              (route) => false,
+                            );
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Logged out successfully')),
+                              const SnackBar(
+                                content: Text('Logged out successfully'),
+                              ),
                             );
                           },
                           child: const Text(
@@ -450,10 +466,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                 ),
                 Text(
                   grade,
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 14,
-                  ),
+                  style: const TextStyle(color: Colors.grey, fontSize: 14),
                 ),
               ],
             ),
@@ -489,10 +502,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
               const SizedBox(height: 4),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ],
           ),
