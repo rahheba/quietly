@@ -81,6 +81,11 @@ class _LoginPageState extends State<LoginPage> {
                 context,
                 MaterialPageRoute(builder: (context) => TeacherBottomNav()),
               );
+            }else if (role == 'parent') {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => ParentDashboard()),
+              );
             } else {
               Navigator.pushReplacement(
                 context,

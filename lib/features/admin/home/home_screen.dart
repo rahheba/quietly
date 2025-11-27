@@ -1,10 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:quietly/features/admin/class/classlist_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
-  AdminHomeScreen({super.key, this.onnavstd});
-  VoidCallback? onnavstd;
+  final VoidCallback? onnavstd;
+  
+  const AdminHomeScreen({super.key, this.onnavstd});
   
   @override
   Widget build(BuildContext context) {
@@ -58,7 +58,8 @@ class AdminHomeScreen extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: [
-        StreamBuilder(
+        // Total Classes Card
+        StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance.collection('Classes').snapshots(),
           builder: (context, asyncSnapshot) {
             return _buildStatCard(
@@ -76,21 +77,37 @@ class AdminHomeScreen extends StatelessWidget {
           },
         ),
         SizedBox(height: 8),
-        _buildStatCard(
-          ontap: () {
-            if (onnavstd != null) onnavstd!();
+        
+        // Total Students Card
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('Users')
+              .where('role', isEqualTo: 'student')
+              .where('status', isEqualTo: 1)
+              .snapshots(),
+          builder: (context, asyncSnapshot) {
+            return _buildStatCard(
+              ontap: () {
+                if (onnavstd != null) onnavstd!();
+              },
+              title: 'Total Students',
+              value: (asyncSnapshot.data == null || asyncSnapshot.data!.docs.isEmpty)
+                  ? '0'
+                  : asyncSnapshot.data!.docs.length.toString(),
+              icon: Icons.school_outlined,
+              gradientColors: [Color(0xFF4facfe), Color(0xFF00f2fe)],
+              iconBgColor: Color(0xFF4facfe).withOpacity(0.1),
+            );
           },
-          title: 'Total Students',
-          value: '245',
-          icon: Icons.school_outlined,
-          gradientColors: [Color(0xFF4facfe), Color(0xFF00f2fe)],
-          iconBgColor: Color(0xFF4facfe).withOpacity(0.1),
         ),
         SizedBox(height: 8),
-        StreamBuilder(
+        
+        // Total Teachers Card
+        StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('Users')
               .where('role', isEqualTo: 'teacher')
+              .where('status', isEqualTo: 1)
               .snapshots(),
           builder: (context, asyncSnapshot) {
             return _buildStatCard(

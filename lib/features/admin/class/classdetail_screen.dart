@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'addstudent.dart';
 
 class ClassDetailsScreen extends StatelessWidget {
   final String classId;
@@ -40,9 +41,20 @@ class ClassDetailsScreen extends StatelessWidget {
           ),
         ],
       ),
+
+      // ✅ FAB Navigates to AddStudent Screen
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          _showAddStudentDialog(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AddStudentPage(
+                classId: classId,
+                className: className,
+                departmentName: departmentName,
+              ),
+            ),
+          );
         },
         backgroundColor: Color(0xFF667eea),
         icon: Icon(Icons.person_add, color: Colors.white),
@@ -259,14 +271,14 @@ class ClassDetailsScreen extends StatelessWidget {
                 SizedBox(height: 20),
                 Divider(color: Colors.grey.shade200),
                 SizedBox(height: 16),
-                
+
                 // Student Details
                 _buildInfoRow(Icons.school_outlined, 'Department', department),
                 SizedBox(height: 12),
                 _buildInfoRow(Icons.location_on_outlined, 'Place', place),
                 SizedBox(height: 20),
-                
-                // Parent Details Section
+
+                // Parent Details
                 Container(
                   padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -324,153 +336,6 @@ class ClassDetailsScreen extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  void _showAddStudentDialog(BuildContext context) {
-    final nameController = TextEditingController();
-    final emailController = TextEditingController();
-    final departmentController = TextEditingController();
-    final placeController = TextEditingController();
-    final parentNameController = TextEditingController();
-    final parentEmailController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text(
-          'Add New Student',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.grey.shade800,
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildTextField(nameController, 'Student Name', Icons.person),
-              SizedBox(height: 12),
-              _buildTextField(emailController, 'Student Email', Icons.email),
-              SizedBox(height: 12),
-              _buildTextField(departmentController, 'Department', Icons.school),
-              SizedBox(height: 12),
-              _buildTextField(placeController, 'Place', Icons.location_on),
-              SizedBox(height: 12),
-              _buildTextField(parentNameController, 'Parent Name', Icons.person_outline),
-              SizedBox(height: 12),
-              _buildTextField(parentEmailController, 'Parent Email', Icons.email_outlined),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              _addStudent(
-                context,
-                name: nameController.text,
-                email: emailController.text,
-                department: departmentController.text,
-                place: placeController.text,
-                parentName: parentNameController.text,
-                parentEmail: parentEmailController.text,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF667eea),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              'Add Student',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label,
-    IconData icon,
-  ) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: Color(0xFF667eea)),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Color(0xFF667eea), width: 2),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _addStudent(
-    BuildContext context, {
-    required String name,
-    required String email,
-    required String department,
-    required String place,
-    required String parentName,
-    required String parentEmail,
-  }) async {
-    if (name.isEmpty || email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please fill in at least name and email'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('Classes')
-          .doc(classId)
-          .collection('Students')
-          .add({
-        'name': name,
-        'email': email,
-        'department': department,
-        'place': place,
-        'parentName': parentName,
-        'parentEmail': parentEmail,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Student added successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error adding student: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 
   Future<void> _deleteStudent(BuildContext context, String studentId) async {
