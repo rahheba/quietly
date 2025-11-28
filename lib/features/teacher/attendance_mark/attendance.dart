@@ -1,4 +1,7 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TeacherAttendanceModifier extends StatefulWidget {
   const TeacherAttendanceModifier({Key? key}) : super(key: key);
@@ -16,8 +19,9 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
   String filterStatus = 'all';
   Map<String, String> modifiedRecords = {};
   String saveStatus = '';
+  bool isLoading = false;
+  bool isLoadingStudents = false;
 
-  // Updated periods with correct timings
   final List<Map<String, String>> periods = [
     {
       'id': '1',
@@ -51,109 +55,155 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
     },
   ];
 
-  final List<Map<String, String>> classes = [
-    {'id': 'CS101', 'name': 'Computer Science 101', 'section': 'A'},
-    {'id': 'CS102', 'name': 'Data Structures', 'section': 'B'},
-    {'id': 'CS201', 'name': 'Algorithms', 'section': 'A'},
-  ];
+  List<Map<String, dynamic>> classes = [];
+  List<Map<String, dynamic>> students = [];
 
-  List<Map<String, dynamic>> students = [
-    {
-      'id': 'S001',
-      'name': 'Alice Johnson',
-      'deviceId': 'DEV001',
-      'status': 'present',
-      'autoMarked': true,
-      'entryTime': '09:35 AM',
-    },
-    {
-      'id': 'S002',
-      'name': 'Bob Smith',
-      'deviceId': 'DEV002',
-      'status': 'present',
-      'autoMarked': true,
-      'entryTime': '09:32 AM',
-    },
-    {
-      'id': 'S003',
-      'name': 'Charlie Brown',
-      'deviceId': 'DEV003',
-      'status': 'absent',
-      'autoMarked': true,
-      'entryTime': null,
-    },
-    {
-      'id': 'S004',
-      'name': 'Diana Prince',
-      'deviceId': 'DEV004',
-      'status': 'present',
-      'autoMarked': true,
-      'entryTime': '09:45 AM',
-    },
-    {
-      'id': 'S005',
-      'name': 'Ethan Hunt',
-      'deviceId': 'DEV005',
-      'status': 'late',
-      'autoMarked': true,
-      'entryTime': '10:05 AM',
-    },
-    {
-      'id': 'S006',
-      'name': 'Fiona Green',
-      'deviceId': 'DEV006',
-      'status': 'absent',
-      'autoMarked': true,
-      'entryTime': null,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadClasses();
+    log("message");
+  }
 
-  void toggleAttendance(String studentId, String currentStatus) {
-    final Map<String, String> statusCycle = {
-      'present': 'absent',
-      'absent': 'late',
-      'late': 'present',
-    };
+  Future<void> _loadClasses() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final classesSnapshot = await FirebaseFirestore.instance
+          .collection('Classes')
+          .get();
+
+      classes = classesSnapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'name': data['departmenttitle'] ?? 'Unknown Class',
+          'code': data['departmentcode'] ?? '',
+          'classname': data['classname'] ?? '',
+          'section': _getSectionFromClassname(data['classname']),
+        };
+      }).toList();
+
+      // Sort classes by name
+      classes.sort(
+        (a, b) => a['name'].toString().compareTo(b['name'].toString()),
+      );
+    } catch (e) {
+      print('Error loading classes: $e');
+      _showErrorSnackbar('Error loading classes: $e');
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadStudents() async {
+    if (selectedClass.isEmpty) {
+      setState(() {
+        students = [];
+      });
+      return;
+    }
 
     setState(() {
-      modifiedRecords[studentId] = statusCycle[currentStatus]!;
+      isLoadingStudents = true;
+    });
+
+    try {
+      final studentsSnapshot = await FirebaseFirestore.instance
+          .collection('classes')
+          .doc(selectedClass)
+          .collection('Students')
+          .get();
+
+      students = studentsSnapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'name': data['name'] ?? 'Unknown Student',
+          'rollNumber': data['rollNumber'] ?? data['id'] ?? '',
+          'deviceId': data['deviceId'] ?? '',
+          'status': 'absent', // Default status
+          'autoMarked': false,
+          'entryTime': null,
+          'isPresent': false,
+          'isLate': false,
+        };
+      }).toList();
+
+      // Sort students by name
+      students.sort(
+        (a, b) => a['name'].toString().compareTo(b['name'].toString()),
+      );
+    } catch (e) {
+      print('Error loading students: $e');
+      _showErrorSnackbar('Error loading students: $e');
+    } finally {
+      setState(() {
+        isLoadingStudents = false;
+      });
+    }
+  }
+
+  String _getSectionFromClassname(String classname) {
+    if (classname.toLowerCase().contains('3rd')) return '3rd Year';
+    if (classname.toLowerCase().contains('2nd')) return '2nd Year';
+    if (classname.toLowerCase().contains('1st')) return '1st Year';
+    if (classname.toLowerCase().contains('bvoc')) return 'BVOC';
+    return 'General';
+  }
+
+  void _markAttendance(String studentId, String status) {
+    setState(() {
+      modifiedRecords[studentId] = status;
     });
   }
 
-  Color getStatusColor(String status) {
+  void _markAllAttendance(String status) {
+    setState(() {
+      for (var student in students) {
+        modifiedRecords[student['id']] = status;
+      }
+    });
+  }
+
+  Color _getStatusColor(String status) {
     switch (status) {
       case 'present':
         return Colors.green.shade100;
       case 'absent':
         return Colors.red.shade100;
       case 'late':
-        return Colors.yellow.shade100;
+        return Colors.orange.shade100;
       default:
         return Colors.grey.shade100;
     }
   }
 
-  Color getStatusTextColor(String status) {
+  Color _getStatusTextColor(String status) {
     switch (status) {
       case 'present':
         return Colors.green.shade800;
       case 'absent':
         return Colors.red.shade800;
       case 'late':
-        return Colors.yellow.shade800;
+        return Colors.orange.shade800;
       default:
         return Colors.grey.shade800;
     }
   }
 
-  IconData getStatusIcon(String status) {
+  IconData _getStatusIcon(String status) {
     switch (status) {
       case 'present':
-        return Icons.check;
+        return Icons.check_circle;
       case 'absent':
-        return Icons.close;
+        return Icons.cancel;
       case 'late':
-        return Icons.warning;
+        return Icons.watch_later;
       default:
         return Icons.help;
     }
@@ -165,7 +215,7 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
           student['name'].toString().toLowerCase().contains(
             searchQuery.toLowerCase(),
           ) ||
-          student['id'].toString().toLowerCase().contains(
+          student['rollNumber'].toString().toLowerCase().contains(
             searchQuery.toLowerCase(),
           );
       final currentStatus = modifiedRecords[student['id']] ?? student['status'];
@@ -175,691 +225,237 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
     }).toList();
   }
 
-  Future<void> handleSave() async {
+  Future<void> _saveAttendance() async {
+    if (selectedClass.isEmpty || selectedPeriod.isEmpty) {
+      _showErrorSnackbar('Please select class and period first');
+      return;
+    }
+
+    if (modifiedRecords.isEmpty) {
+      _showErrorSnackbar('No changes to save');
+      return;
+    }
+
     setState(() {
       saveStatus = 'saving';
     });
 
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      final attendanceDate = selectedDate.toIso8601String().split('T')[0];
 
-    setState(() {
-      saveStatus = 'saved';
       for (var student in students) {
-        if (modifiedRecords.containsKey(student['id'])) {
-          student['status'] = modifiedRecords[student['id']];
-          student['autoMarked'] = false;
+        final studentId = student['id'];
+        if (modifiedRecords.containsKey(studentId)) {
+          final attendanceRef = FirebaseFirestore.instance
+              .collection('classes')
+              .doc(selectedClass)
+              .collection('Students')
+              .doc(studentId)
+              .collection('attendance')
+              .doc('${attendanceDate}_${selectedPeriod}');
+
+          final attendanceData = {
+            'date': selectedDate,
+            'period': selectedPeriod,
+            'status': modifiedRecords[studentId],
+            'markedBy': 'teacher',
+            'markedAt': FieldValue.serverTimestamp(),
+            'autoMarked': false,
+            'periodTime': periods.firstWhere(
+              (p) => p['id'] == selectedPeriod,
+            )['time'],
+            'lateAfter': periods.firstWhere(
+              (p) => p['id'] == selectedPeriod,
+            )['lateAfter'],
+          };
+
+          batch.set(attendanceRef, attendanceData);
         }
       }
-      modifiedRecords.clear();
-    });
 
-    await Future.delayed(const Duration(seconds: 3));
-    setState(() {
-      saveStatus = '';
-    });
+      await batch.commit();
+
+      setState(() {
+        saveStatus = 'saved';
+        modifiedRecords.clear();
+      });
+
+      _showSuccessSnackbar('Attendance saved successfully!');
+
+      await Future.delayed(const Duration(seconds: 2));
+      setState(() {
+        saveStatus = '';
+      });
+    } catch (e) {
+      print('Error saving attendance: $e');
+      setState(() {
+        saveStatus = 'error';
+      });
+      _showErrorSnackbar('Error saving attendance: $e');
+    }
   }
 
-  int getStatusCount(String status) {
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showSuccessSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  int _getStatusCount(String status) {
     return students.where((s) {
       final currentStatus = modifiedRecords[s['id']] ?? s['status'];
       return currentStatus == status;
     }).length;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final filteredStudents = getFilteredStudents();
-    final modificationCount = modifiedRecords.length;
-
-    return Scaffold(
-      backgroundColor: Colors.blue.shade50,
-      appBar: AppBar(
-        backgroundColor: Colors.indigo.shade600,
-        title: const Text('Attendance Modifier'),
-        actions: [
-          if (modificationCount > 0)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: ElevatedButton.icon(
-                onPressed: handleSave,
-                icon: const Icon(Icons.save),
-                label: Text('Save Changes ($modificationCount)'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.indigo.shade600,
-                ),
-              ),
-            ),
-        ],
-      ),
-      body: SingleChildScrollView(
+  Widget _buildClassDropdown() {
+    return Card(
+      elevation: 2,
+      child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                border: Border.all(color: Colors.orange.shade200),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.orange.shade700),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Students entering after 30 minutes are automatically marked as LATE',
-                      style: TextStyle(
-                        color: Colors.orange.shade900,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
+            Text(
+              'SELECT CLASS',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+                letterSpacing: 1,
               ),
             ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: selectedClass.isEmpty ? null : selectedClass,
+                  isExpanded: true,
+                  hint: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('Choose a class...'),
+                  ),
+                  items: classes.map((cls) {
+                    return DropdownMenuItem<String>(
+                      value: cls['id'],
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              cls['name'],
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${cls['code']} • ${cls['classname']}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedClass = value ?? '';
+                      modifiedRecords.clear();
+                      saveStatus = '';
+                    });
+                    _loadStudents();
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-            if (saveStatus == 'saved')
-              Container(
-                padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.only(bottom: 16),
+  Widget _buildDateSelector() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'DATE',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: selectedDate,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                );
+                if (date != null) {
+                  setState(() {
+                    selectedDate = date;
+                    modifiedRecords.clear();
+                    saveStatus = '';
+                  });
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  border: Border.all(color: Colors.green.shade200),
+                  border: Border.all(color: Colors.grey.shade300),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green.shade800),
-                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.calendar_today,
+                      size: 20,
+                      color: Colors.grey.shade700,
+                    ),
+                    const SizedBox(width: 12),
                     Text(
-                      'Changes saved successfully!',
-                      style: TextStyle(
-                        color: Colors.green.shade800,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                      style: const TextStyle(fontSize: 14),
                     ),
-                  ],
-                ),
-              ),
-
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Date',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              InkWell(
-                                onTap: () async {
-                                  final date = await showDatePicker(
-                                    context: context,
-                                    initialDate: selectedDate,
-                                    firstDate: DateTime(2020),
-                                    lastDate: DateTime.now(),
-                                  );
-                                  if (date != null) {
-                                    setState(() {
-                                      selectedDate = date;
-                                      modifiedRecords.clear();
-                                      saveStatus = '';
-                                    });
-                                  }
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: Colors.grey.shade300,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.calendar_today,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Class',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              DropdownButtonFormField<String>(
-                                value: selectedClass.isEmpty
-                                    ? null
-                                    : selectedClass,
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                hint: const Text('Select class'),
-                                isExpanded:
-                                    true, // ADD THIS LINE - Critical fix!
-                                items: classes.map((cls) {
-                                  return DropdownMenuItem(
-                                    value: cls['id'],
-                                    child: Text(
-                                      '${cls['name']} - Section ${cls['section']}',
-                                      overflow: TextOverflow
-                                          .ellipsis, // ADD THIS LINE
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  setState(() {
-                                    selectedClass = value ?? '';
-                                    modifiedRecords.clear();
-                                    saveStatus = '';
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Period',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              DropdownButtonFormField<String>(
-                                value: selectedPeriod.isEmpty
-                                    ? null
-                                    : selectedPeriod,
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                hint: const Text('Select period'),
-                                isExpanded:
-                                    true, // ADD THIS LINE - Critical fix!
-                                items: periods.map((period) {
-                                  return DropdownMenuItem(
-                                    value: period['id'],
-                                    child: Text(
-                                      '${period['name']} (${period['time']})',
-                                      overflow: TextOverflow
-                                          .ellipsis, // ADD THIS LINE
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  setState(() {
-                                    selectedPeriod = value ?? '';
-                                    modifiedRecords.clear();
-                                    saveStatus = '';
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Filter Status',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              DropdownButtonFormField<String>(
-                                value: filterStatus,
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: 'all',
-                                    child: Text('All Students'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'present',
-                                    child: Text('Present'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'absent',
-                                    child: Text('Absent'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'late',
-                                    child: Text('Late'),
-                                  ),
-                                ],
-                                onChanged: (value) {
-                                  setState(() {
-                                    filterStatus = value ?? 'all';
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      onChanged: (value) {
-                        setState(() {
-                          searchQuery = value;
-                        });
-                      },
-                      decoration: InputDecoration(
-                        labelText: 'Search Student',
-                        hintText: 'Search by name or ID...',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            if (selectedPeriod.isNotEmpty)
-              Card(
-                color: Colors.indigo.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.schedule, color: Colors.indigo.shade700),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Period Schedule',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.indigo.shade900,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${periods.firstWhere((p) => p['id'] == selectedPeriod)['name']}: ${periods.firstWhere((p) => p['id'] == selectedPeriod)['time']}',
-                        style: TextStyle(color: Colors.indigo.shade700),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Late after: ${periods.firstWhere((p) => p['id'] == selectedPeriod)['lateAfter']}',
-                        style: TextStyle(
-                          color: Colors.orange.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            const SizedBox(height: 16),
-
-            Card(
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.indigo.shade600,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(4),
-                        topRight: Radius.circular(4),
-                      ),
-                    ),
-                    child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Student Attendance Records',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Click on status badges to modify attendance',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (filteredStudents.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(48),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.people_outline,
-                            size: 48,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'No students found matching your filters',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filteredStudents.length,
-                      itemBuilder: (context, index) {
-                        final student = filteredStudents[index];
-                        final studentId = student['id'] as String;
-                        final currentStatus =
-                            modifiedRecords[studentId] ??
-                            student['status'] as String;
-                        final isModified = modifiedRecords.containsKey(
-                          studentId,
-                        );
-
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: isModified
-                                ? Colors.blue.shade50
-                                : Colors.white,
-                            border: Border(
-                              bottom: BorderSide(color: Colors.grey.shade200),
-                            ),
-                          ),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.indigo.shade100,
-                              child: Text(
-                                student['name'].toString()[0],
-                                style: TextStyle(
-                                  color: Colors.indigo.shade800,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              student['name'] as String,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Text(
-                              '${student['id']} • Entry: ${student['entryTime'] ?? '-'}',
-                              style: TextStyle(color: Colors.grey.shade600),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                InkWell(
-                                  onTap: () => toggleAttendance(
-                                    studentId,
-                                    currentStatus,
-                                  ),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: getStatusColor(currentStatus),
-                                      border: Border.all(
-                                        color: getStatusTextColor(
-                                          currentStatus,
-                                        ),
-                                        width: 2,
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          getStatusIcon(currentStatus),
-                                          size: 16,
-                                          color: getStatusTextColor(
-                                            currentStatus,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          currentStatus[0].toUpperCase() +
-                                              currentStatus.substring(1),
-                                          style: TextStyle(
-                                            color: getStatusTextColor(
-                                              currentStatus,
-                                            ),
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                if (isModified)
-                                  Chip(
-                                    label: const Text(
-                                      'Modified',
-                                      style: TextStyle(fontSize: 10),
-                                    ),
-                                    backgroundColor: Colors.blue.shade100,
-                                    padding: EdgeInsets.zero,
-                                    labelPadding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                  )
-                                else
-                                  Text(
-                                    'Auto',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade500,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Attendance Summary',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Total',
-                                  style: TextStyle(color: Colors.grey.shade600),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${students.length}',
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Present',
-                                  style: TextStyle(
-                                    color: Colors.green.shade600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${getStatusCount('present')}',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green.shade800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Absent',
-                                  style: TextStyle(color: Colors.red.shade600),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${getStatusCount('absent')}',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.red.shade800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.yellow.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Late',
-                                  style: TextStyle(
-                                    color: Colors.yellow.shade700,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${getStatusCount('late')}',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.yellow.shade800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    const Spacer(),
+                    Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
                   ],
                 ),
               ),
@@ -867,6 +463,625 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPeriodSelector() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'PERIOD',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: selectedPeriod.isEmpty ? null : selectedPeriod,
+                  isExpanded: true,
+                  hint: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('Select period...'),
+                  ),
+                  items: periods.map((period) {
+                    return DropdownMenuItem<String>(
+                      value: period['id'],
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              period['name'] ?? '',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              period['time'] ?? '',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedPeriod = value ?? '';
+                      modifiedRecords.clear();
+                      saveStatus = '';
+                    });
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    if (students.isEmpty) return const SizedBox();
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'QUICK ACTIONS',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _markAllAttendance('present'),
+                    icon: Icon(Icons.check_circle, color: Colors.green),
+                    label: Text(
+                      'Mark All Present',
+                      style: TextStyle(color: Colors.green),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.green),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _markAllAttendance('absent'),
+                    icon: Icon(Icons.cancel, color: Colors.red),
+                    label: Text(
+                      'Mark All Absent',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _markAllAttendance('late'),
+                    icon: Icon(Icons.watch_later, color: Colors.orange),
+                    label: Text(
+                      'Mark All Late',
+                      style: TextStyle(color: Colors.orange),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.orange),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudentList() {
+    if (selectedClass.isEmpty) {
+      return Card(
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(48),
+          child: Column(
+            children: [
+              Icon(Icons.class_, size: 64, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              Text(
+                'Select a Class',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Choose a class from the dropdown above to view students',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (isLoadingStudents) {
+      return Card(
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(48),
+          child: Column(
+            children: [
+              CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text('Loading students...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (students.isEmpty) {
+      return Card(
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(48),
+          child: Column(
+            children: [
+              Icon(Icons.people_outline, size: 64, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              Text(
+                'No Students Found',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No students are enrolled in this class',
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final filteredStudents = getFilteredStudents();
+
+    return Column(
+      children: [
+        // Header with search and filter
+        Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        onChanged: (value) =>
+                            setState(() => searchQuery = value),
+                        decoration: InputDecoration(
+                          hintText: 'Search students...',
+                          prefixIcon: Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: filterStatus,
+                          items: const [
+                            DropdownMenuItem(value: 'all', child: Text('All')),
+                            DropdownMenuItem(
+                              value: 'present',
+                              child: Text('Present'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'absent',
+                              child: Text('Absent'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'late',
+                              child: Text('Late'),
+                            ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => filterStatus = value ?? 'all'),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${filteredStudents.length} Students',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    Text(
+                      '${modifiedRecords.length} Modified',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: modifiedRecords.isEmpty
+                            ? Colors.grey
+                            : Colors.blue,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Students list
+        Card(
+          elevation: 2,
+          child: ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filteredStudents.length,
+            itemBuilder: (context, index) {
+              final student = filteredStudents[index];
+              final studentId = student['id'] as String;
+              final currentStatus =
+                  modifiedRecords[studentId] ?? student['status'];
+              final isModified = modifiedRecords.containsKey(studentId);
+
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isModified ? Colors.blue.shade50 : Colors.white,
+                  border: Border.all(
+                    color: isModified
+                        ? Colors.blue.shade200
+                        : Colors.grey.shade200,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.indigo.shade100,
+                    child: Text(
+                      student['name'].toString().substring(0, 1).toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.indigo.shade800,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    student['name'],
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    student['rollNumber']?.isNotEmpty == true
+                        ? 'Roll No: ${student['rollNumber']}'
+                        : 'ID: ${student['id']}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Status indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(currentStatus),
+                          border: Border.all(
+                            color: _getStatusTextColor(currentStatus),
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _getStatusIcon(currentStatus),
+                              size: 16,
+                              color: _getStatusTextColor(currentStatus),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              currentStatus.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: _getStatusTextColor(currentStatus),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Action buttons
+                      PopupMenuButton<String>(
+                        icon: Icon(
+                          Icons.more_vert,
+                          color: Colors.grey.shade600,
+                        ),
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            value: 'present',
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle, color: Colors.green),
+                                const SizedBox(width: 8),
+                                Text('Mark Present'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'absent',
+                            child: Row(
+                              children: [
+                                Icon(Icons.cancel, color: Colors.red),
+                                const SizedBox(width: 8),
+                                Text('Mark Absent'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'late',
+                            child: Row(
+                              children: [
+                                Icon(Icons.watch_later, color: Colors.orange),
+                                const SizedBox(width: 8),
+                                Text('Mark Late'),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onSelected: (value) =>
+                            _markAttendance(studentId, value),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    // Cycle through statuses on tap
+                    final nextStatus = currentStatus == 'present'
+                        ? 'absent'
+                        : currentStatus == 'absent'
+                        ? 'late'
+                        : 'present';
+                    _markAttendance(studentId, nextStatus);
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummary() {
+    if (students.isEmpty) return const SizedBox();
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'ATTENDANCE SUMMARY',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _buildSummaryItem(
+                  'Total',
+                  '${students.length}',
+                  Colors.grey,
+                  Icons.people,
+                ),
+                _buildSummaryItem(
+                  'Present',
+                  '${_getStatusCount('present')}',
+                  Colors.green,
+                  Icons.check_circle,
+                ),
+                _buildSummaryItem(
+                  'Absent',
+                  '${_getStatusCount('absent')}',
+                  Colors.red,
+                  Icons.cancel,
+                ),
+                _buildSummaryItem(
+                  'Late',
+                  '${_getStatusCount('late')}',
+                  Colors.orange,
+                  Icons.watch_later,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem(
+    String title,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 10,
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final modificationCount = modifiedRecords.length;
+
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: const Text('Attendance Management'),
+        backgroundColor: Colors.indigo.shade700,
+        actions: [
+          if (modificationCount > 0)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: ElevatedButton.icon(
+                onPressed: _saveAttendance,
+                icon: const Icon(Icons.save),
+                label: Text('SAVE ($modificationCount)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.indigo.shade700,
+                ),
+              ),
+            ),
+        ],
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Selection Section
+                  Column(
+                    children: [
+                      _buildClassDropdown(),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: _buildDateSelector()),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildPeriodSelector()),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Quick Actions
+                  if (selectedClass.isNotEmpty && students.isNotEmpty)
+                    _buildQuickActions(),
+
+                  const SizedBox(height: 16),
+
+                  // Students List
+                  _buildStudentList(),
+
+                  const SizedBox(height: 16),
+
+                  // Summary
+                  _buildSummary(),
+
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
     );
   }
 }
