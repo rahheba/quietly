@@ -100,6 +100,7 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
     }
   }
 
+  // In _loadStudents() - fix to uppercase 'Classes'
   Future<void> _loadStudents() async {
     if (selectedClass.isEmpty) {
       setState(() {
@@ -114,9 +115,9 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
 
     try {
       final studentsSnapshot = await FirebaseFirestore.instance
-          .collection('classes')
+          .collection('Classes') // CHANGE: uppercase 'Classes'
           .doc(selectedClass)
-          .collection('Students')
+          .collection('Students') // Keep uppercase 'Students'
           .get();
 
       students = studentsSnapshot.docs.map((doc) {
@@ -126,7 +127,7 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
           'name': data['name'] ?? 'Unknown Student',
           'rollNumber': data['rollNumber'] ?? data['id'] ?? '',
           'deviceId': data['deviceId'] ?? '',
-          'status': 'absent', // Default status
+          'status': 'absent',
           'autoMarked': false,
           'entryTime': null,
           'isPresent': false,
@@ -134,7 +135,6 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
         };
       }).toList();
 
-      // Sort students by name
       students.sort(
         (a, b) => a['name'].toString().compareTo(b['name'].toString()),
       );
@@ -247,10 +247,11 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
       for (var student in students) {
         final studentId = student['id'];
         if (modifiedRecords.containsKey(studentId)) {
+          // In _saveAttendance() - fix collection name
           final attendanceRef = FirebaseFirestore.instance
-              .collection('classes')
+              .collection('Classes') // CHANGE: uppercase 'Classes'
               .doc(selectedClass)
-              .collection('Students')
+              .collection('Students') // Keep uppercase 'Students'
               .doc(studentId)
               .collection('attendance')
               .doc('${attendanceDate}_${selectedPeriod}');
@@ -369,7 +370,7 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
                               cls['name'],
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                fontSize: 7,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -446,7 +447,7 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
                   children: [
                     Icon(
                       Icons.calendar_today,
-                      size: 20,
+                      size: 4,
                       color: Colors.grey.shade700,
                     ),
                     const SizedBox(width: 12),
@@ -473,6 +474,7 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'PERIOD',
@@ -485,6 +487,7 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
             ),
             const SizedBox(height: 8),
             Container(
+              height: 56, // Fixed height
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey.shade300),
                 borderRadius: BorderRadius.circular(8),
@@ -500,28 +503,41 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
                   items: periods.map((period) {
                     return DropdownMenuItem<String>(
                       value: period['id'],
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              period['name'] ?? '',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                      child: SizedBox(
+                        // ADD SizedBox with fixed height
+                        height: 50, // Fixed height for dropdown items
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4, // Reduced vertical padding
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment:
+                                MainAxisAlignment.center, // Center content
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                period['name'] ?? '',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14, // Slightly smaller font
+                                ),
+                                maxLines: 1, // Ensure single line
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            Text(
-                              period['time'] ?? '',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
+                              const SizedBox(height: 2), // Smaller spacing
+                              Text(
+                                period['time'] ?? '',
+                                style: TextStyle(
+                                  fontSize: 11, // Smaller font
+                                  color: Colors.grey.shade600,
+                                ),
+                                maxLines: 1, // Ensure single line
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );
