@@ -1355,11 +1355,13 @@ class _TeacherProfileState extends State<TeacherProfile> {
       final user = _auth.currentUser;
       if (user == null) return;
 
+      // Create the class document
       await _firestore.collection('Classes').add({
         ...classData,
         'teacherId': user.uid,
         'teacherName': userData?['name'] ?? '',
         'createdAt': FieldValue.serverTimestamp(),
+        'studentIds': [], // Initialize with empty array
       });
 
       await _loadTeacherClasses();
@@ -1412,6 +1414,17 @@ class _TeacherProfileState extends State<TeacherProfile> {
 
   Future<void> _deleteClass(String classId) async {
     try {
+      // Delete all students from this class first
+      final studentsSnapshot = await _firestore
+          .collection('Students')
+          .where('classId', isEqualTo: classId)
+          .get();
+      
+      for (var doc in studentsSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // Then delete the class
       await _firestore.collection('Classes').doc(classId).delete();
       await _loadTeacherClasses();
 
@@ -1434,31 +1447,184 @@ class _TeacherProfileState extends State<TeacherProfile> {
     }
   }
 
-  // Get student details from Users collection
+  // Get student details from Students collection
   Future<List<Map<String, dynamic>>> _getStudentDetails(
-    List<String> studentIds,
+    String classId,
   ) async {
-    List<Map<String, dynamic>> students = [];
+    try {
+      final studentsSnapshot = await _firestore
+          .collection('Students')
+          .where('classId', isEqualTo: classId)
+          .get();
 
-    for (String studentId in studentIds) {
-      try {
-        final studentDoc = await _firestore
+      List<Map<String, dynamic>> students = [];
+
+      for (var doc in studentsSnapshot.docs) {
+        final studentData = doc.data();
+        
+        // Get user details from Users collection
+        final userDoc = await _firestore
             .collection('Users')
-            .doc(studentId)
+            .doc(studentData['studentId'])
             .get();
-        if (studentDoc.exists) {
+        
+        if (userDoc.exists) {
           students.add({
-            'id': studentId,
-            'name': studentDoc.data()?['name'] ?? 'Unknown',
-            'email': studentDoc.data()?['email'] ?? '',
+            'studentDocId': doc.id, // Students collection document ID
+            'studentId': studentData['studentId'],
+            'name': userDoc.data()?['name'] ?? 'Unknown',
+            'email': userDoc.data()?['email'] ?? '',
+            'classId': classId,
           });
         }
-      } catch (e) {
-        print('Error fetching student $studentId: $e');
+      }
+
+      return students;
+    } catch (e) {
+      print('Error fetching students: $e');
+      return [];
+    }
+  }
+
+  // Add student to class (save to Students collection)
+  Future<void> _addStudentToClass(
+    String classId,
+    String studentUserId,
+  ) async {
+    try {
+      // Check if student already exists in this class
+      final existingStudent = await _firestore
+          .collection('Students')
+          .where('classId', isEqualTo: classId)
+          .where('studentId', isEqualTo: studentUserId)
+          .get();
+
+      if (existingStudent.docs.isNotEmpty) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Student already in this class',
+          status: SnackStatus.warning,
+        );
+        return;
+      }
+
+      // Get student details from Users collection
+      final userDoc = await _firestore
+          .collection('Users')
+          .doc(studentUserId)
+          .get();
+
+      if (!userDoc.exists) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Student not found',
+          status: SnackStatus.error,
+        );
+        return;
+      }
+
+      final userData = userDoc.data();
+      
+      // Get class details
+      final classDoc = await _firestore.collection('Classes').doc(classId).get();
+      if (!classDoc.exists) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Class not found',
+          status: SnackStatus.error,
+        );
+        return;
+      }
+      
+      final classData = classDoc.data();
+      
+      // Add to Students collection
+      await _firestore.collection('Students').add({
+        'studentId': studentUserId,
+        'studentName': userData?['name'] ?? 'Unknown',
+        'studentEmail': userData?['email'] ?? '',
+        'classId': classId,
+        'className': classData?['className'] ?? '',
+        'teacherId': _auth.currentUser?.uid ?? '',
+        'teacherName': this.userData?['name'] ?? '',
+        'enrolledAt': FieldValue.serverTimestamp(),
+        'status': 1, // Active
+      });
+
+      // Also update the class document to include student ID in studentIds array
+      List<String> currentStudents = 
+          List<String>.from(classData?['studentIds'] ?? []);
+      
+      if (!currentStudents.contains(studentUserId)) {
+        currentStudents.add(studentUserId);
+        await _firestore.collection('Classes').doc(classId).update({
+          'studentIds': currentStudents,
+        });
+      }
+
+      await _loadTeacherClasses();
+
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Student added successfully',
+          status: SnackStatus.success,
+        );
+      }
+    } catch (e) {
+      print('Error adding student: $e');
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Failed to add student',
+          status: SnackStatus.error,
+        );
       }
     }
+  }
 
-    return students;
+  // Remove student from class (delete from Students collection)
+  Future<void> _removeStudentFromClass(
+    String classId,
+    String studentDocId, // Students collection document ID
+    String studentUserId, // Users collection user ID
+  ) async {
+    try {
+      // Remove from Students collection
+      await _firestore.collection('Students').doc(studentDocId).delete();
+
+      // Remove from class's studentIds array
+      final classDoc = await _firestore.collection('Classes').doc(classId).get();
+      if (classDoc.exists) {
+        List<String> currentStudents = 
+            List<String>.from(classDoc.data()?['studentIds'] ?? []);
+        
+        currentStudents.remove(studentUserId);
+        
+        await _firestore.collection('Classes').doc(classId).update({
+          'studentIds': currentStudents,
+        });
+      }
+
+      await _loadTeacherClasses();
+
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Student removed successfully',
+          status: SnackStatus.success,
+        );
+      }
+    } catch (e) {
+      print('Error removing student: $e');
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Failed to remove student',
+          status: SnackStatus.error,
+        );
+      }
+    }
   }
 
   Future<void> _sendNotification(
@@ -1880,7 +2046,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
     );
   }
 
-  // View Classes and Students Dialog
+  // View Classes and Students Dialog - Updated to use Students collection
   void _showManageClassesDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -1944,7 +2110,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
                                   builder: (context) => AlertDialog(
                                     title: Text('Delete Class'),
                                     content: Text(
-                                      'Are you sure you want to delete this class?',
+                                      'Are you sure you want to delete this class? This will also remove all students from this class.',
                                     ),
                                     actions: [
                                       TextButton(
@@ -1974,9 +2140,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
                         ),
                         children: [
                           FutureBuilder<List<Map<String, dynamic>>>(
-                            future: _getStudentDetails(
-                              List<String>.from(classData['studentIds'] ?? []),
-                            ),
+                            future: _getStudentDetails(classData['id']),
                             builder: (context, snapshot) {
                               if (snapshot.connectionState ==
                                   ConnectionState.waiting) {
@@ -2018,15 +2182,11 @@ class _TeacherProfileState extends State<TeacherProfile> {
                                         color: Colors.red,
                                       ),
                                       onPressed: () async {
-                                        List<String> updatedStudents =
-                                            List<String>.from(
-                                              classData['studentIds'] ?? [],
-                                            );
-                                        updatedStudents.remove(student['id']);
-
-                                        await _updateClass(classData['id'], {
-                                          'studentIds': updatedStudents,
-                                        });
+                                        await _removeStudentFromClass(
+                                          classData['id'],
+                                          student['studentDocId'],
+                                          student['studentId'],
+                                        );
 
                                         Navigator.pop(context);
                                         _showManageClassesDialog(context);
@@ -2053,7 +2213,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
     );
   }
 
-  // Create Class Dialog (Simplified - removed subject and device ID)
+  // Create Class Dialog
   void _showCreateClassDialog(BuildContext context) {
     final TextEditingController _classNameController = TextEditingController();
 
@@ -2097,7 +2257,6 @@ class _TeacherProfileState extends State<TeacherProfile> {
 
               await _createClass({
                 'className': className,
-                'studentIds': [], // Empty student list initially
               });
 
               Navigator.pop(context);
@@ -2126,7 +2285,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
           children: [
             Icon(Icons.person_add, color: Colors.green),
             SizedBox(width: 12),
-            Text('Add Student'),
+            Text('Add Student to ${classData['className']}'),
           ],
         ),
         content: FutureBuilder<QuerySnapshot>(
@@ -2178,21 +2337,11 @@ class _TeacherProfileState extends State<TeacherProfile> {
                     subtitle: Text(studentData['email'] ?? ''),
                     trailing: ElevatedButton(
                       onPressed: () async {
-                        List<String> updatedStudents = List<String>.from(
-                          currentStudentIds,
+                        await _addStudentToClass(
+                          classData['id'],
+                          student.id,
                         );
-                        updatedStudents.add(student.id);
-
-                        await _updateClass(classData['id'], {
-                          'studentIds': updatedStudents,
-                        });
-
                         Navigator.pop(context);
-                        showCustomSnackBar(
-                          context: context,
-                          message: 'Student added successfully',
-                          status: SnackStatus.success,
-                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
