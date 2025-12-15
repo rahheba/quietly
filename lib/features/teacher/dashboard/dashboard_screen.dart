@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class TeacherDashboard extends StatelessWidget {
@@ -26,11 +27,16 @@ class TeacherDashboard extends StatelessWidget {
               color: Colors.green,
             ),
             SizedBox(height: 16),
-            _buildTeacherCard(
-              icon: Icons.phone_disabled,
-              title: 'Total Students',
-              count: '30',
-              color: Colors.blue,
+            StreamBuilder(
+              stream: FirebaseFirestore.instance.collection('Users').where('role',isEqualTo: 'student').snapshots(),
+              builder: (context, asyncSnapshot) {
+                return _buildTeacherCard(
+                  icon: Icons.phone_disabled,
+                  title: 'Total Students',
+                  count: asyncSnapshot.hasData?asyncSnapshot.data!.docs.length.toString():'0',
+                  color: Colors.blue,
+                );
+              }
             ),
             SizedBox(height: 24),
             Text(

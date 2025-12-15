@@ -1207,6 +1207,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:quietly/features/admin/class/classlist_screen.dart';
 import 'package:quietly/features/auth/view/login_screen.dart';
 import 'package:quietly/utils/methods/custom_snackbar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1271,10 +1272,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
       final user = _auth.currentUser;
       if (user == null) return;
 
-      final classesSnapshot = await _firestore
-          .collection('Classes')
-          .where('teacherId', isEqualTo: user.uid)
-          .get();
+      final classesSnapshot = await _firestore.collection('Classes').get();
 
       setState(() {
         userClasses = classesSnapshot.docs
@@ -1417,9 +1415,9 @@ class _TeacherProfileState extends State<TeacherProfile> {
       // Delete all students from this class first
       final studentsSnapshot = await _firestore
           .collection('Students')
-          .where('classId', isEqualTo: classId)
+          // .where('classId', isEqualTo: classId)
           .get();
-      
+
       for (var doc in studentsSnapshot.docs) {
         await doc.reference.delete();
       }
@@ -1448,9 +1446,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
   }
 
   // Get student details from Students collection
-  Future<List<Map<String, dynamic>>> _getStudentDetails(
-    String classId,
-  ) async {
+  Future<List<Map<String, dynamic>>> _getStudentDetails(String classId) async {
     try {
       final studentsSnapshot = await _firestore
           .collection('Students')
@@ -1461,13 +1457,13 @@ class _TeacherProfileState extends State<TeacherProfile> {
 
       for (var doc in studentsSnapshot.docs) {
         final studentData = doc.data();
-        
+
         // Get user details from Users collection
         final userDoc = await _firestore
             .collection('Users')
             .doc(studentData['studentId'])
             .get();
-        
+
         if (userDoc.exists) {
           students.add({
             'studentDocId': doc.id, // Students collection document ID
@@ -1487,10 +1483,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
   }
 
   // Add student to class (save to Students collection)
-  Future<void> _addStudentToClass(
-    String classId,
-    String studentUserId,
-  ) async {
+  Future<void> _addStudentToClass(String classId, String studentUserId) async {
     try {
       // Check if student already exists in this class
       final existingStudent = await _firestore
@@ -1524,9 +1517,12 @@ class _TeacherProfileState extends State<TeacherProfile> {
       }
 
       final userData = userDoc.data();
-      
+
       // Get class details
-      final classDoc = await _firestore.collection('Classes').doc(classId).get();
+      final classDoc = await _firestore
+          .collection('Classes')
+          .doc(classId)
+          .get();
       if (!classDoc.exists) {
         showCustomSnackBar(
           context: context,
@@ -1535,9 +1531,9 @@ class _TeacherProfileState extends State<TeacherProfile> {
         );
         return;
       }
-      
+
       final classData = classDoc.data();
-      
+
       // Add to Students collection
       await _firestore.collection('Students').add({
         'studentId': studentUserId,
@@ -1552,9 +1548,10 @@ class _TeacherProfileState extends State<TeacherProfile> {
       });
 
       // Also update the class document to include student ID in studentIds array
-      List<String> currentStudents = 
-          List<String>.from(classData?['studentIds'] ?? []);
-      
+      List<String> currentStudents = List<String>.from(
+        classData?['studentIds'] ?? [],
+      );
+
       if (!currentStudents.contains(studentUserId)) {
         currentStudents.add(studentUserId);
         await _firestore.collection('Classes').doc(classId).update({
@@ -1594,13 +1591,17 @@ class _TeacherProfileState extends State<TeacherProfile> {
       await _firestore.collection('Students').doc(studentDocId).delete();
 
       // Remove from class's studentIds array
-      final classDoc = await _firestore.collection('Classes').doc(classId).get();
+      final classDoc = await _firestore
+          .collection('Classes')
+          .doc(classId)
+          .get();
       if (classDoc.exists) {
-        List<String> currentStudents = 
-            List<String>.from(classDoc.data()?['studentIds'] ?? []);
-        
+        List<String> currentStudents = List<String>.from(
+          classDoc.data()?['studentIds'] ?? [],
+        );
+
         currentStudents.remove(studentUserId);
-        
+
         await _firestore.collection('Classes').doc(classId).update({
           'studentIds': currentStudents,
         });
@@ -1809,20 +1810,20 @@ class _TeacherProfileState extends State<TeacherProfile> {
 
               // Teacher-specific buttons
               if (isTeacher) ...[
+                // _buildButton(
+                //   context,
+                //   label: 'Create New Class',
+                //   icon: Icons.add_circle,
+                //   color: Colors.blue,
+                //   onPressed: () => _showCreateClassDialog(context),
+                // ),
+                // SizedBox(height: 12),
                 _buildButton(
                   context,
-                  label: 'Create New Class',
-                  icon: Icons.add_circle,
-                  color: Colors.blue,
-                  onPressed: () => _showCreateClassDialog(context),
-                ),
-                SizedBox(height: 12),
-                _buildButton(
-                  context,
-                  label: 'View All Classes & Students',
+                  label: 'Create New Classes & Add Students',
                   icon: Icons.people,
                   color: Colors.green,
-                  onPressed: () => _showManageClassesDialog(context),
+                  onPressed: () => ClassesListScreen(),
                 ),
                 SizedBox(height: 12),
                 _buildButton(
@@ -2086,7 +2087,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
                       child: ExpansionTile(
                         leading: Icon(Icons.class_, color: Colors.blue),
                         title: Text(
-                          classData['className'] ?? 'Unnamed Class',
+                          classData['classname'] ?? 'Unnamed Class',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
@@ -2255,9 +2256,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
                 return;
               }
 
-              await _createClass({
-                'className': className,
-              });
+              await _createClass({'className': className});
 
               Navigator.pop(context);
             },
@@ -2337,10 +2336,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
                     subtitle: Text(studentData['email'] ?? ''),
                     trailing: ElevatedButton(
                       onPressed: () async {
-                        await _addStudentToClass(
-                          classData['id'],
-                          student.id,
-                        );
+                        await _addStudentToClass(classData['id'], student.id);
                         Navigator.pop(context);
                       },
                       style: ElevatedButton.styleFrom(

@@ -5,6 +5,7 @@ import 'package:quietly/features/admin/admin_dashboard.dart';
 import 'package:quietly/features/admin/home/home_screen.dart';
 import 'package:quietly/features/auth/view/login_screen.dart';
 import 'package:quietly/features/bottom_nav/bottom_nav.dart';
+import 'package:quietly/features/parent/parent_home.dart';
 import 'package:quietly/features/teacher/bottomnav/teacher_bottom_nav_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -49,6 +50,11 @@ class _SplashScreenState extends State<SplashScreen> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => TeacherBottomNav()),
+            );
+          } else if (role == 'parent') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => ParentDashboard()),
             );
           } else {
             Navigator.pushReplacement(

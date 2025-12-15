@@ -21,7 +21,7 @@ class AddStudentPage extends StatefulWidget {
 class _AddStudentPageState extends State<AddStudentPage> {
   final _formKey = GlobalKey<FormState>();
   final _studentNameController = TextEditingController();
-  final _departmentController = TextEditingController();
+  // final _departmentController = TextEditingController();
   final _registerNoController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
@@ -38,7 +38,7 @@ class _AddStudentPageState extends State<AddStudentPage> {
   @override
   void dispose() {
     _studentNameController.dispose();
-    _departmentController.dispose();
+    // _departmentController.dispose();
     _registerNoController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
@@ -56,7 +56,8 @@ class _AddStudentPageState extends State<AddStudentPage> {
         _isLoading = true;
       });
 
-      User? currentUser = FirebaseAuth.instance.currentUser; // Save current logged-in user
+      User? currentUser =
+          FirebaseAuth.instance.currentUser; // Save current logged-in user
 
       try {
         String? studentUid;
@@ -65,9 +66,9 @@ class _AddStudentPageState extends State<AddStudentPage> {
         // Step 1: Create Student Firebase Auth Account
         UserCredential studentCredential = await FirebaseAuth.instance
             .createUserWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
+              email: _emailController.text.trim(),
+              password: _passwordController.text.trim(),
+            );
         studentUid = studentCredential.user?.uid;
 
         // Step 2: Save Student Data to Users Collection
@@ -76,22 +77,29 @@ class _AddStudentPageState extends State<AddStudentPage> {
               .collection('Users')
               .doc(studentUid)
               .set({
-            'name': _studentNameController.text.trim(),
-            'namefilter': [
-              for (int i = 1; i <= _studentNameController.text.trim().length; i++)
-                _studentNameController.text.trim().substring(0, i).toLowerCase(),
-            ],
-            'email': _emailController.text.trim(),
-            'password': _passwordController.text.trim(),
-            'uid': studentUid,
-            'department': _departmentController.text.trim(),
-            'registerNo': _registerNoController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'place': _addressController.text.trim(),
-            'status': 1,
-            'role': 'student',
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+                'name': _studentNameController.text.trim(),
+                'namefilter': [
+                  for (
+                    int i = 1;
+                    i <= _studentNameController.text.trim().length;
+                    i++
+                  )
+                    _studentNameController.text
+                        .trim()
+                        .substring(0, i)
+                        .toLowerCase(),
+                ],
+                'email': _emailController.text.trim(),
+                'password': _passwordController.text.trim(),
+                'uid': studentUid,
+                // 'department': _departmentController.text.trim(),
+                'registerNo': _registerNoController.text.trim(),
+                'phone': _phoneController.text.trim(),
+                'place': _addressController.text.trim(),
+                'status': 1,
+                'role': 'student',
+                'createdAt': FieldValue.serverTimestamp(),
+              });
         }
 
         // Step 3: Sign out the student account (we'll log back as admin later)
@@ -100,9 +108,9 @@ class _AddStudentPageState extends State<AddStudentPage> {
         // Step 4: Create Parent Firebase Auth Account
         UserCredential parentCredential = await FirebaseAuth.instance
             .createUserWithEmailAndPassword(
-          email: _parentEmailController.text.trim(),
-          password: _parentPasswordController.text.trim(),
-        );
+              email: _parentEmailController.text.trim(),
+              password: _parentPasswordController.text.trim(),
+            );
         parentUid = parentCredential.user?.uid;
 
         // Step 5: Save Parent Data to Users Collection
@@ -111,19 +119,26 @@ class _AddStudentPageState extends State<AddStudentPage> {
               .collection('Users')
               .doc(parentUid)
               .set({
-            'name': _parentNameController.text.trim(),
-            'namefilter': [
-              for (int i = 1; i <= _parentNameController.text.trim().length; i++)
-                _parentNameController.text.trim().substring(0, i).toLowerCase(),
-            ],
-            'email': _parentEmailController.text.trim(),
-            'password': _parentPasswordController.text.trim(),
-            'uid': parentUid,
-            'studentId': studentUid,
-            'status': 1,
-            'role': 'parent',
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+                'name': _parentNameController.text.trim(),
+                'namefilter': [
+                  for (
+                    int i = 1;
+                    i <= _parentNameController.text.trim().length;
+                    i++
+                  )
+                    _parentNameController.text
+                        .trim()
+                        .substring(0, i)
+                        .toLowerCase(),
+                ],
+                'email': _parentEmailController.text.trim(),
+                'password': _parentPasswordController.text.trim(),
+                'uid': parentUid,
+                'studentId': studentUid,
+                'status': 1,
+                'role': 'parent',
+                'createdAt': FieldValue.serverTimestamp(),
+              });
 
           // Update student with parentId
           await FirebaseFirestore.instance
@@ -134,7 +149,7 @@ class _AddStudentPageState extends State<AddStudentPage> {
 
         // Step 6: Sign out parent and re-authenticate as the original admin/teacher
         await FirebaseAuth.instance.signOut();
-        
+
         if (currentUser != null) {
           // Re-authenticate the original user (admin/teacher)
           // Note: You'll need to store/retrieve the admin's credentials securely
@@ -149,20 +164,21 @@ class _AddStudentPageState extends State<AddStudentPage> {
             .collection('Students')
             .doc(studentUid)
             .set({
-          'stdid': studentUid,
-          'name': _studentNameController.text.trim(),
-          'department': _departmentController.text.trim(),
-          'registerNo': _registerNoController.text.trim(),
-          'phone': _phoneController.text.trim(),
-          'email': _emailController.text.trim(),
-          'password': _passwordController.text.trim(),
-          'place': _addressController.text.trim(),
-          'parentid': parentUid,
-          'parentName': _parentNameController.text.trim(),
-          'parentEmail': _parentEmailController.text.trim(),
-          'parentPassword': _parentPasswordController.text.trim(),
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+              'stdid': studentUid,
+              'name': _studentNameController.text.trim(),
+              'classname': widget.className,
+              // 'department': _departmentController.text.trim(),
+              'registerNo': _registerNoController.text.trim(),
+              'phone': _phoneController.text.trim(),
+              'email': _emailController.text.trim(),
+              'password': _passwordController.text.trim(),
+              'place': _addressController.text.trim(),
+              'parentid': parentUid,
+              'parentName': _parentNameController.text.trim(),
+              'parentEmail': _parentEmailController.text.trim(),
+              'parentPassword': _parentPasswordController.text.trim(),
+              'createdAt': FieldValue.serverTimestamp(),
+            });
 
         setState(() {
           _isLoading = false;
@@ -269,9 +285,9 @@ class _AddStudentPageState extends State<AddStudentPage> {
                     Text(
                       'Student Information',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
                     ),
                     const SizedBox(height: 16),
 
@@ -292,22 +308,22 @@ class _AddStudentPageState extends State<AddStudentPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Department
-                    TextFormField(
-                      controller: _departmentController,
-                      decoration: const InputDecoration(
-                        labelText: 'Department',
-                        prefixIcon: Icon(Icons.school),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter department';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
+                    // // Department
+                    // TextFormField(
+                    //   controller: _departmentController,
+                    //   decoration: const InputDecoration(
+                    //     labelText: 'Department',
+                    //     prefixIcon: Icon(Icons.school),
+                    //     border: OutlineInputBorder(),
+                    //   ),
+                    //   validator: (value) {
+                    //     if (value == null || value.trim().isEmpty) {
+                    //       return 'Please enter department';
+                    //     }
+                    //     return null;
+                    //   },
+                    // ),
+                    // const SizedBox(height: 16),
 
                     // Register Number
                     TextFormField(
@@ -423,9 +439,9 @@ class _AddStudentPageState extends State<AddStudentPage> {
                     Text(
                       'Parent Information',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
                     ),
                     const SizedBox(height: 16),
 
@@ -510,7 +526,11 @@ class _AddStudentPageState extends State<AddStudentPage> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                          Icon(
+                            Icons.info_outline,
+                            color: Colors.orange.shade700,
+                            size: 20,
+                          ),
                           SizedBox(width: 12),
                           Expanded(
                             child: Text(

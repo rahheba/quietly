@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:quietly/features/parent/profile_screen.dart';
+import 'package:quietly/features/parent/show_attendence.dart';
 
 class ParentDashboard extends StatefulWidget {
   const ParentDashboard({super.key});
@@ -434,7 +435,14 @@ class _ParentDashboardState extends State<ParentDashboard> {
                         _buildQuickAction(
                           icon: Icons.check_circle_outline,
                           label: 'Attendance Report',
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ParentAttendanceScreen(),
+                              ),
+                            );
+                          },
                         ),
                         _buildQuickAction(
                           icon: Icons.phone_android,

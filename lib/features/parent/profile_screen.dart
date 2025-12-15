@@ -1,5 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:quietly/features/auth/view/login_screen.dart';
 
@@ -12,19 +12,249 @@ class ParentProfileScreen extends StatefulWidget {
 
 class _ParentProfileScreenState extends State<ParentProfileScreen> {
   FirebaseAuth _auth = FirebaseAuth.instance;
-  final TextEditingController _nameController = TextEditingController(
-    text: 'Jennifer Johnson',
-  );
-  final TextEditingController _emailController = TextEditingController(
-    text: 'jennifer.johnson@email.com',
-  );
-  final TextEditingController _phoneController = TextEditingController(
-    text: '+1 (555) 123-4567',
-  );
+  FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
 
   bool notificationsEnabled = true;
   bool emailNotifications = true;
   bool smsNotifications = false;
+
+  Map<String, dynamic>? parentData;
+  List<Map<String, dynamic>> childrenData = [];
+  bool isLoading = true;
+  List<DocumentSnapshot> classes = [];
+  String? className;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadParentData();
+  }
+
+  Future<void> _loadParentData() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        // Get parent data from Users collection where role is "parent"
+        final parentDoc = await _firestore
+            .collection('Users')
+            .where('email', isEqualTo: user.email)
+            .where('role', isEqualTo: 'parent')
+            .limit(1)
+            .get();
+
+        if (parentDoc.docs.isNotEmpty) {
+          parentData =
+              parentDoc.docs.first.data() as Map<String, dynamic>? ?? {};
+          parentData!['id'] = parentDoc.docs.first.id;
+
+          // Update text controllers with actual data
+          _nameController.text = parentData!['name']?.toString() ?? '';
+          _emailController.text = parentData!['email']?.toString() ?? '';
+          _phoneController.text = parentData!['phone']?.toString() ?? '';
+
+          // Load all classes first
+          await _loadClasses();
+
+          // Load children data for this parent
+          await _loadChildrenData(parentData!['id']);
+        }
+      }
+    } catch (e) {
+      print('Error loading parent data: $e');
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadClasses() async {
+    try {
+      final classesSnapshot = await _firestore.collection('Classes').get();
+      classes = classesSnapshot.docs;
+    } catch (e) {
+      print('Error loading classes: $e');
+    }
+  }
+
+  Future<void> _loadChildrenData(String parentId) async {
+    try {
+      childrenData.clear();
+
+      // Query Students subcollection in each class where parentid matches
+      for (var classDoc in classes) {
+        final studentsSnapshot = await _firestore
+            .collection('Classes')
+            .doc(classDoc.id)
+            .collection('Students')
+            .where('parentid', isEqualTo: parentId)
+            .get();
+
+        for (var studentDoc in studentsSnapshot.docs) {
+          final studentData = studentDoc.data() as Map<String, dynamic>? ?? {};
+          studentData['id'] = studentDoc.id;
+          studentData['classId'] = classDoc.id;
+
+          // Get classname from the student document itself
+          // The classname field is in the Students document
+          final className =
+              studentData['classname']?.toString() ?? 'Unknown Class';
+          // studentData['className'] = className;
+
+          childrenData.add(studentData);
+        }
+      }
+    } catch (e) {
+      print('Error loading children data: $e');
+    }
+  }
+
+  Future<void> _updateParentProfile() async {
+    try {
+      if (parentData == null || parentData!['id'] == null) return;
+
+      await _firestore.collection('Users').doc(parentData!['id']).update({
+        'name': _nameController.text,
+        'email': _emailController.text,
+        'phone': _phoneController.text,
+        'updatedAt': DateTime.now(),
+      });
+
+      // Update parent info in all associated student records across all classes
+      final batch = _firestore.batch();
+      for (var child in childrenData) {
+        final childRef = _firestore
+            .collection('Classes')
+            .doc(child['classId']?.toString())
+            .collection('Students')
+            .doc(child['id']?.toString());
+        batch.update(childRef, {
+          'parentName': _nameController.text,
+          'parentEmail': _emailController.text,
+        });
+      }
+
+      if (childrenData.isNotEmpty) {
+        await batch.commit();
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile updated successfully'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Reload data
+      await _loadParentData();
+    } catch (e) {
+      print('Error updating profile: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to update profile'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _addChild() async {
+    if (parentData == null) return;
+
+    // Show add child dialog
+    showDialog(
+      context: context,
+      builder: (context) => AddChildDialog(
+        parentId: parentData!['id']?.toString() ?? '',
+        parentName: _nameController.text,
+        parentEmail: _emailController.text,
+        classes: classes,
+        onChildAdded: () {
+          _loadChildrenData(parentData!['id']);
+        },
+      ),
+    );
+  }
+
+  Future<void> _editChild(Map<String, dynamic> child) async {
+    // Show edit child dialog
+    showDialog(
+      context: context,
+      builder: (context) => EditChildDialog(
+        childData: child,
+        onChildUpdated: () {
+          _loadChildrenData(parentData?['id']?.toString() ?? '');
+        },
+      ),
+    );
+  }
+
+  Future<void> _deleteChild(Map<String, dynamic> child) async {
+    final childId = child['id']?.toString();
+    final classId = child['classId']?.toString();
+    final childName = child['name']?.toString() ?? 'this child';
+
+    if (childId == null || classId == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Child'),
+        content: Text(
+          'Are you sure you want to remove $childName from your profile?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _firestore
+                    .collection('Classes')
+                    .doc(classId)
+                    .collection('Students')
+                    .doc(childId)
+                    .update({
+                      'parentid': '',
+                      'parentName': '',
+                      'parentEmail': '',
+                    });
+
+                setState(() {
+                  childrenData.removeWhere(
+                    (c) => c['id']?.toString() == childId,
+                  );
+                });
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Child removed successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to remove child'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Remove', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -36,6 +266,25 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFFEF3C7),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFB45309)),
+        ),
+      );
+    }
+
+    final initials = _nameController.text.isNotEmpty
+        ? _nameController.text
+              .split(' ')
+              .where((word) => word.isNotEmpty)
+              .map((word) => word[0])
+              .take(2)
+              .join()
+              .toUpperCase()
+        : 'PA';
+
     return Scaffold(
       backgroundColor: const Color(0xFFFEF3C7),
       appBar: AppBar(
@@ -55,15 +304,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Profile updated successfully'),
-                  backgroundColor: Colors.green,
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
+            onPressed: _updateParentProfile,
             child: const Text(
               'Save',
               style: TextStyle(
@@ -100,10 +341,10 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                               ),
                             ],
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
-                              'JJ',
-                              style: TextStyle(
+                              initials,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 36,
                                 fontWeight: FontWeight.bold,
@@ -111,30 +352,14 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                             ),
                           ),
                         ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFD97706),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Jennifer Johnson',
-                      style: TextStyle(
+                    Text(
+                      _nameController.text.isNotEmpty
+                          ? _nameController.text
+                          : 'Parent Name',
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -199,46 +424,65 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Children',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildChildItem('Sarah Johnson', '10th Grade', 'SJ'),
-                    const SizedBox(height: 12),
-                    _buildChildItem('Mike Johnson', '8th Grade', 'MJ'),
-                    const SizedBox(height: 16),
-                    InkWell(
-                      onTap: () {},
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: const Color(0xFFB45309),
-                            width: 2,
-                            style: BorderStyle.solid,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Children',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
-                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add, color: Color(0xFFB45309)),
-                            SizedBox(width: 8),
-                            Text(
-                              'Add Another Child',
-                              style: TextStyle(
-                                color: Color(0xFFB45309),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          '${childrenData.length} child${childrenData.length != 1 ? 'ren' : ''}',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
+                    const SizedBox(height: 16),
+                    if (childrenData.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Text(
+                          'No children linked to your account',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      )
+                    else
+                      Column(
+                        children: [
+                          ...childrenData.map((child) {
+                            final childName =
+                                child['name']?.toString() ?? 'Unknown';
+                            // final className =
+
+                            final initials = childName
+                                .split(' ')
+                                .where((word) => word.isNotEmpty)
+                                .map((word) => word[0])
+                                .take(2)
+                                .join()
+                                .toUpperCase();
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _buildChildItem(
+                                childName,
+                                className ?? 'N/A',
+                                initials,
+                                onEdit: () => _editChild(child),
+                                onDelete: () => _deleteChild(child),
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -309,7 +553,9 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                     _buildSettingItem(
                       icon: Icons.lock_outline,
                       title: 'Change Password',
-                      onTap: () {},
+                      onTap: () {
+                        // Navigate to change password screen
+                      },
                     ),
                     const Divider(),
                     _buildSettingItem(
@@ -430,7 +676,13 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
     );
   }
 
-  Widget _buildChildItem(String name, String grade, String initials) {
+  Widget _buildChildItem(
+    String name,
+    String grade,
+    String initials, {
+    VoidCallback? onEdit,
+    VoidCallback? onDelete,
+  }) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -471,10 +723,16 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined, color: Color(0xFFB45309)),
-            onPressed: () {},
-          ),
+          // if (onEdit != null)
+          //   IconButton(
+          //     icon: const Icon(Icons.edit_outlined, color: Color(0xFFB45309)),
+          //     onPressed: onEdit,
+          //   ),
+          // if (onDelete != null)
+          //   IconButton(
+          //     icon: const Icon(Icons.delete_outline, color: Colors.red),
+          //     onPressed: onDelete,
+          //   ),
         ],
       ),
     );
@@ -542,6 +800,221 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// Add Child Dialog
+class AddChildDialog extends StatefulWidget {
+  final String parentId;
+  final String parentName;
+  final String parentEmail;
+  final List<DocumentSnapshot> classes;
+  final VoidCallback onChildAdded;
+
+  const AddChildDialog({
+    required this.parentId,
+    required this.parentName,
+    required this.parentEmail,
+    required this.classes,
+    required this.onChildAdded,
+    super.key,
+  });
+
+  @override
+  State<AddChildDialog> createState() => _AddChildDialogState();
+}
+
+class _AddChildDialogState extends State<AddChildDialog> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TextEditingController _registerNoController = TextEditingController();
+  String? selectedClassId;
+  bool isLoading = false;
+
+  Future<void> _linkStudent() async {
+    if (selectedClassId == null || _registerNoController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select class and enter register number'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      // Search for student by register number in selected class
+      final studentsSnapshot = await _firestore
+          .collection('Classes')
+          .doc(selectedClassId)
+          .collection('Students')
+          .where('registerNo', isEqualTo: _registerNoController.text)
+          .limit(1)
+          .get();
+
+      if (studentsSnapshot.docs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Student not found with this register number'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final studentDoc = studentsSnapshot.docs.first;
+      final studentData = studentDoc.data() as Map<String, dynamic>? ?? {};
+
+      // Check if student already has a parent
+      final parentId = studentData['parentid']?.toString();
+      if (parentId != null && parentId.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This student is already linked to another parent'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Update student with parent info
+      await studentDoc.reference.update({
+        'parentid': widget.parentId,
+        'parentName': widget.parentName,
+        'parentEmail': widget.parentEmail,
+      });
+
+      Navigator.pop(context);
+      widget.onChildAdded();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Student linked successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Link Student'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Select Class',
+                border: OutlineInputBorder(),
+              ),
+              value: selectedClassId,
+              items: widget.classes.map((classDoc) {
+                final classData = classDoc.data() as Map<String, dynamic>?;
+                final className =
+                    classData?['name']?.toString() ?? 'Unknown Class';
+                final dept = classData?['department']?.toString() ?? '';
+                return DropdownMenuItem(
+                  value: classDoc.id,
+                  child: Text('$className${dept.isNotEmpty ? ' - $dept' : ''}'),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedClassId = value;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _registerNoController,
+              decoration: const InputDecoration(
+                labelText: 'Student Register Number',
+                border: OutlineInputBorder(),
+                hintText: 'Enter student register number',
+              ),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: isLoading ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: isLoading ? null : _linkStudent,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFB45309),
+          ),
+          child: isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Text('Link Student'),
+        ),
+      ],
+    );
+  }
+}
+
+// Edit Child Dialog
+class EditChildDialog extends StatefulWidget {
+  final Map<String, dynamic> childData;
+  final VoidCallback onChildUpdated;
+
+  const EditChildDialog({
+    required this.childData,
+    required this.onChildUpdated,
+    super.key,
+  });
+
+  @override
+  State<EditChildDialog> createState() => _EditChildDialogState();
+}
+
+class _EditChildDialogState extends State<EditChildDialog> {
+  @override
+  Widget build(BuildContext context) {
+    final childName = widget.childData['name']?.toString() ?? 'Unknown';
+    final className = widget.childData['className']?.toString() ?? 'No Class';
+    final registerNo = widget.childData['registerNo']?.toString() ?? 'N/A';
+    final email = widget.childData['email']?.toString() ?? 'N/A';
+    final phone = widget.childData['phone']?.toString() ?? 'N/A';
+
+    return AlertDialog(
+      title: Text('Student: $childName'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Class: $className'),
+          Text('Register No: $registerNo'),
+          Text('Email: $email'),
+          Text('Phone: $phone'),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
     );
   }
 }
