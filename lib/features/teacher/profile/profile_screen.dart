@@ -1823,7 +1823,12 @@ class _TeacherProfileState extends State<TeacherProfile> {
                   label: 'Create New Classes & Add Students',
                   icon: Icons.people,
                   color: Colors.green,
-                  onPressed: () => ClassesListScreen(),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ClassesListScreen(showAppBar: true),
+                    ),
+                  ),
                 ),
                 SizedBox(height: 12),
                 _buildButton(
@@ -2398,7 +2403,7 @@ class _TeacherProfileState extends State<TeacherProfile> {
                   items: userClasses.map((classData) {
                     return DropdownMenuItem(
                       value: classData,
-                      child: Text(classData['className']),
+                      child: Text(classData['classname']),
                     );
                   }).toList(),
                   onChanged: (value) => setState(() => selectedClass = value),
