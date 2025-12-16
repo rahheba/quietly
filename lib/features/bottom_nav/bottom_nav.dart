@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:quietly/features/home/home_screen.dart';
 import 'package:quietly/features/notification/notification.dart';
+import 'package:quietly/features/parent/show_attendence.dart';
 import 'package:quietly/features/profile/profile.dart';
 import 'package:quietly/features/attendance_view/attendance_view.dart';
 
@@ -29,7 +30,7 @@ class _MainScreenState extends State<BottomNav> {
             classMode: _classMode,
             onToggleClassMode: _toggleClassMode,
           ),
-          StudentAttendanceViewer(),
+          ParentAttendanceScreen(),
           NotificationScreen(),
           ProfileScreen(),
         ],

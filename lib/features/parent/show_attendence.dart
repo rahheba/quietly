@@ -198,97 +198,95 @@ class _ParentAttendanceScreenState extends State<ParentAttendanceScreen> {
 
   Widget _buildChildSelector() {
     if (childrenData.isEmpty) {
-      return Card(
-        elevation: 2,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Icon(Icons.child_care, size: 48, color: Colors.grey.shade400),
-              const SizedBox(height: 12),
-              Text(
-                'No Children Linked',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade600,
-                ),
+      return Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.child_care, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text(
+              'No Children Linked',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Link students to your account in Profile',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade500),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Link students to your account in Profile',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+            ),
+          ],
         ),
       );
     }
 
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'SELECT CHILD',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade600,
-                letterSpacing: 1,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'SELECT CHILD',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade600,
+              letterSpacing: 1,
             ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
+          ),
+          const SizedBox(height: 10),
+
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: DropdownButtonFormField<String>(
               value: selectedChildId,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 12),
               ),
               items: childrenData.map((child) {
                 final childName = child['name']?.toString() ?? 'Unknown';
 
-                // Debug: Print all keys in child data
-                print('Child data keys: ${child.keys}');
-                print('Child data: $child');
-
-                // Try multiple possible field names for classname
                 final className =
-                    child['classname']?.toString() ??
-                    child['className']?.toString() ??
-                    child['class']?.toString() ??
-                    child['class_name']?.toString() ??
-                    child['classname']?.toString() ?? // original
+                    child['classname'] ??
+                    child['className'] ??
+                    child['class'] ??
+                    child['class_name'] ??
                     'No Class';
-
-                print('Found classname: $className');
 
                 return DropdownMenuItem<String>(
                   value: child['id']?.toString(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        childName,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                  child: Container(
+                    constraints: const BoxConstraints(maxHeight: 48),
+                    alignment: Alignment.centerLeft,
+                    child: RichText(
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '$childName\n',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          TextSpan(
+                            text: className.toString(),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        className,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                    ),
                   ),
                 );
               }).toList(),
@@ -299,8 +297,8 @@ class _ParentAttendanceScreenState extends State<ParentAttendanceScreen> {
                 _loadAttendanceData();
               },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -452,55 +450,55 @@ class _ParentAttendanceScreenState extends State<ParentAttendanceScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Status',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: filterStatus,
-                            items: [
-                              DropdownMenuItem(
-                                value: 'all',
-                                child: Text('All Status'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'present',
-                                child: Text('Present'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'absent',
-                                child: Text('Absent'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'late',
-                                child: Text('Late'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() => filterStatus = value ?? 'all');
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // const SizedBox(width: 16),
+                // Expanded(
+                //   child: Column(
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Text(
+                //         'Status',
+                //         style: TextStyle(
+                //           fontSize: 12,
+                //           color: Colors.grey.shade600,
+                //         ),
+                //       ),
+                //       const SizedBox(height: 4),
+                //       Container(
+                //         padding: const EdgeInsets.symmetric(horizontal: 8),
+                //         decoration: BoxDecoration(
+                //           border: Border.all(color: Colors.grey.shade300),
+                //           borderRadius: BorderRadius.circular(8),
+                //         ),
+                //         child: DropdownButtonHideUnderline(
+                //           child: DropdownButton<String>(
+                //             value: filterStatus,
+                //             items: [
+                //               DropdownMenuItem(
+                //                 value: 'all',
+                //                 child: Text('All Status'),
+                //               ),
+                //               DropdownMenuItem(
+                //                 value: 'present',
+                //                 child: Text('Present'),
+                //               ),
+                //               DropdownMenuItem(
+                //                 value: 'absent',
+                //                 child: Text('Absent'),
+                //               ),
+                //               DropdownMenuItem(
+                //                 value: 'late',
+                //                 child: Text('Late'),
+                //               ),
+                //             ],
+                //             onChanged: (value) {
+                //               setState(() => filterStatus = value ?? 'all');
+                //             },
+                //           ),
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                // ),
               ],
             ),
           ],
