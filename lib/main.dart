@@ -2,9 +2,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:quietly/features/splash/splash_screen.dart';
 
-void main() {
+import 'utils/methods/mute_fn.dart';
+
+void main() async{
   WidgetsFlutterBinding.ensureInitialized();
   Firebase.initializeApp();
+  await initGeoMute();
   runApp(const MyApp());
 }
 
@@ -16,7 +19,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Demo',
+      title: 'Quietly',
       theme: ThemeData(
         // This is the theme of your application.
         //
