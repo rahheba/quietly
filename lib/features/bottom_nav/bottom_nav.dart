@@ -12,13 +12,6 @@ class BottomNav extends StatefulWidget {
 
 class _MainScreenState extends State<BottomNav> {
   int _currentIndex = 0;
-  bool _classMode = false;
-
-  void _toggleClassMode() {
-    setState(() {
-      _classMode = !_classMode;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,10 +19,7 @@ class _MainScreenState extends State<BottomNav> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          HomeScreen(
-            classMode: _classMode,
-            onToggleClassMode: _toggleClassMode,
-          ),
+          HomeScreen(),
           ParentAttendanceScreen(),
           NotificationScreen(),
           ProfileScreen(),

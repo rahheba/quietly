@@ -1,10 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:quietly/features/class_mode/class_mode_button.dart';
+import 'package:quietly/utils/service/dns_service.dart';
 
-class HomeScreen extends StatelessWidget {
-  final bool classMode;
-  final VoidCallback onToggleClassMode;
+class HomeScreen extends StatefulWidget {
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
 
-  HomeScreen({required this.classMode, required this.onToggleClassMode});
+class _HomeScreenState extends State<HomeScreen> {
+  final DndService _dndService = DndService();
+  bool _isClassMode = false;
+  bool _isLoading = false;
+
+  Future<void> _toggleClassMode() async {
+    if (_isLoading) return;
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      if (!_isClassMode) {
+        if (!await _dndService.hasAccess()) {
+          await _dndService.openSettings();
+          return;
+        }
+        await _dndService.setSilent();
+      } else {
+        await _dndService.restore();
+      }
+      setState(() => _isClassMode = !_isClassMode);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,15 +125,15 @@ class HomeScreen extends StatelessWidget {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: classMode
+                            color: _isClassMode
                                 ? Colors.green.shade100
                                 : Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            classMode ? 'Active' : 'Inactive',
+                            _isClassMode ? 'Active' : 'Inactive',
                             style: TextStyle(
-                              color: classMode
+                              color: _isClassMode
                                   ? Colors.green.shade700
                                   : Colors.grey.shade600,
                               fontWeight: FontWeight.bold,
@@ -119,43 +152,8 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: onToggleClassMode,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: classMode ? Colors.red : Colors.blue,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 4,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              classMode
-                                  ? Icons.phone_disabled
-                                  : Icons.phone_android,
-                              size: 24,
-                            ),
-                            SizedBox(width: 12),
-                            Text(
-                              classMode
-                                  ? 'Disable Class Mode'
-                                  : 'Enable Class Mode',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (classMode) ...[
+                    ClassModeButton(),
+                    if (_isClassMode) ...[
                       SizedBox(height: 16),
                       Container(
                         width: double.infinity,
